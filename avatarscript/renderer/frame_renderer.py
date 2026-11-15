@@ -1,0 +1,243 @@
+"""Frame renderer and pure-Python SVG rasterizer for AvatarScript."""
+import re
+import xml.etree.ElementTree as ET
+from pathlib import Path
+from typing import Dict, Optional, Tuple
+from PIL import Image, ImageDraw
+from avatarscript.runtime.scene import SceneState
+from avatarscript.runtime.avatar import AvatarState
+from avatarscript.renderer.aura_renderer import AuraRenderer
+
+
+def parse_color(color_str: Optional[str]) -> Optional[Tuple[int, int, int, int]]:
+    """Parse hex color (#RRGGBB or #RGB) to RGBA tuple."""
+    if not color_str or color_str.lower() in ("none", "transparent"):
+        return None
+    c = color_str.strip()
+    if c.startswith("#"):
+        h = c[1:]
+        if len(h) == 3:
+            h = "".join(ch * 2 for ch in h)
+        if len(h) == 6:
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), 255)
+        if len(h) == 8:
+            return (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16), int(h[6:8], 16))
+    return (32, 32, 32, 255)
+
+
+class SVGRasterizer:
+    """Lightweight pure-Python SVG rasterizer using 2x supersampled Pillow ImageDraw."""
+
+    def __init__(self, assets_root: Path):
+        self.assets_root = assets_root
+        self._cache: Dict[str, Image.Image] = {}
+
+    def load_layer_image(self, character: str, filename: str) -> Image.Image:
+        cache_key = f"{character}/{filename}"
+        if cache_key in self._cache:
+            return self._cache[cache_key]
+
+        svg_path = self.assets_root / "characters" / character / filename
+        if not svg_path.exists():
+            raise FileNotFoundError(f"Missing character SVG asset: {svg_path}")
+
+        img = self.rasterize_svg(svg_path)
+        self._cache[cache_key] = img
+        return img
+
+    @staticmethod
+    def rasterize_svg(svg_path: Path, supersample: int = 2) -> Image.Image:
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+        view_box = root.attrib.get("viewBox", "0 0 400 500").split()
+        vw, vh = int(float(view_box[2])), int(float(view_box[3]))
+
+        ss = supersample
+        canvas = Image.new("RGBA", (vw * ss, vh * ss), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(canvas)
+
+        for elem in root:
+            tag = elem.tag.split("}")[-1]
+            fill = parse_color(elem.attrib.get("fill"))
+            stroke = parse_color(elem.attrib.get("stroke"))
+            sw = int(round(float(elem.attrib.get("stroke-width", "0")) * ss))
+
+            if tag == "rect":
+                x = float(elem.attrib.get("x", 0)) * ss
+                y = float(elem.attrib.get("y", 0)) * ss
+                w = float(elem.attrib.get("width", 0)) * ss
+                h = float(elem.attrib.get("height", 0)) * ss
+                rx = float(elem.attrib.get("rx", 0)) * ss
+                if rx > 0:
+                    draw.rounded_rectangle(
+                        [x, y, x + w, y + h], radius=rx, fill=fill, outline=stroke, width=sw
+                    )
+                else:
+                    draw.rectangle([x, y, x + w, y + h], fill=fill, outline=stroke, width=sw)
+
+            elif tag == "circle":
+                cx = float(elem.attrib.get("cx", 0)) * ss
+                cy = float(elem.attrib.get("cy", 0)) * ss
+                r = float(elem.attrib.get("r", 0)) * ss
+                draw.ellipse([cx - r, cy - r, cx + r, cy + r], fill=fill, outline=stroke, width=sw)
+
+            elif tag == "ellipse":
+                cx = float(elem.attrib.get("cx", 0)) * ss
+                cy = float(elem.attrib.get("cy", 0)) * ss
+                rx = float(elem.attrib.get("rx", 0)) * ss
+                ry = float(elem.attrib.get("ry", 0)) * ss
+                draw.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=fill, outline=stroke, width=sw)
+
+            elif tag == "polygon":
+                pts_raw = re.findall(r"[-+]?\d*\.?\d+", elem.attrib.get("points", ""))
+                pts = [
+                    (float(pts_raw[i]) * ss, float(pts_raw[i + 1]) * ss)
+                    for i in range(0, len(pts_raw) - 1, 2)
+                ]
+                if len(pts) >= 3:
+                    draw.polygon(pts, fill=fill, outline=stroke, width=sw)
+
+            elif tag == "line":
+                x1 = float(elem.attrib.get("x1", 0)) * ss
+                y1 = float(elem.attrib.get("y1", 0)) * ss
+                x2 = float(elem.attrib.get("x2", 0)) * ss
+                y2 = float(elem.attrib.get("y2", 0)) * ss
+                if stroke:
+                    draw.line([(x1, y1), (x2, y2)], fill=stroke, width=max(1, sw))
+                    # Add rounded line caps if requested
+                    if elem.attrib.get("stroke-linecap") == "round" and sw > 2:
+                        r_cap = sw / 2.0
+                        draw.ellipse([x1 - r_cap, y1 - r_cap, x1 + r_cap, y1 + r_cap], fill=stroke)
+                        draw.ellipse([x2 - r_cap, y2 - r_cap, x2 + r_cap, y2 + r_cap], fill=stroke)
+
+        return canvas.resize((vw, vh), Image.Resampling.LANCZOS)
+
+
+class FrameRenderer:
+    """Composites SceneState into a Pillow RGBA frame with quantized rig caching."""
+
+    def __init__(self, assets_root: Optional[Path] = None, max_rig_cache_size: int = 256):
+        if assets_root is None:
+            assets_root = Path(__file__).resolve().parent.parent.parent / "assets"
+        self.rasterizer = SVGRasterizer(assets_root)
+        self._rig_cache: Dict[Tuple, Image.Image] = {}
+        self._max_rig_cache_size = max_rig_cache_size
+        self.rig_cache_hits = 0
+        self.rig_cache_misses = 0
+
+    @staticmethod
+    def _build_rig_cache_key(avatar: AvatarState) -> Tuple:
+        """Create a deterministic, quantized cache key for an AvatarState rig."""
+        layer_tuples = tuple(
+            (
+                l.name,
+                l.asset_filename,
+                round(l.x, 2),
+                round(l.y, 2),
+                round(l.scale_x, 4),
+                round(l.scale_y, 4),
+                round(l.rotation, 2),
+                l.visible,
+                round(l.opacity, 3),
+                l.z_order,
+            )
+            for l in sorted(avatar.layers, key=lambda item: item.z_order)
+        )
+        return (
+            avatar.character,
+            round(avatar.scale, 4),
+            round(avatar.rotation, 2),
+            round(avatar.opacity, 3),
+            layer_tuples,
+        )
+
+    def render_avatar_rig(self, avatar: AvatarState) -> Image.Image:
+        """Composite the 6 layers of an avatar into a 400x500 rig canvas, then apply avatar transforms."""
+        cache_key = self._build_rig_cache_key(avatar)
+        if cache_key in self._rig_cache:
+            self.rig_cache_hits += 1
+            return self._rig_cache[cache_key]
+
+        self.rig_cache_misses += 1
+        rig_w, rig_h = 400, 500
+        rig_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
+
+        for layer in sorted(avatar.layers, key=lambda l: l.z_order):
+            if not layer.visible or layer.opacity <= 0.0:
+                continue
+            base_img = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename)
+            layer_img = base_img
+
+            # Apply layer-local scale if non-unit
+            if abs(layer.scale_x - 1.0) > 1e-4 or abs(layer.scale_y - 1.0) > 1e-4:
+                nw = max(1, int(round(rig_w * layer.scale_x)))
+                nh = max(1, int(round(rig_h * layer.scale_y)))
+                scaled = layer_img.resize((nw, nh), Image.Resampling.BICUBIC)
+                temp = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
+                ox = (rig_w - nw) // 2
+                oy = (rig_h - nh) // 2
+                temp.paste(scaled, (ox, oy))
+                layer_img = temp
+
+            # Apply layer-local rotation if non-zero
+            if abs(layer.rotation) > 1e-4:
+                layer_img = layer_img.rotate(
+                    -layer.rotation, resample=Image.Resampling.BICUBIC, center=layer.rotation_center
+                )
+
+            # Apply layer-local translation (x, y)
+            if abs(layer.x) > 1e-4 or abs(layer.y) > 1e-4:
+                temp = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
+                temp.paste(layer_img, (int(round(layer.x)), int(round(layer.y))))
+                layer_img = temp
+
+            rig_canvas.alpha_composite(layer_img)
+
+        # Apply avatar-level scale
+        if abs(avatar.scale - 1.0) > 1e-4:
+            sw = max(1, int(round(rig_w * avatar.scale)))
+            sh = max(1, int(round(rig_h * avatar.scale)))
+            rig_canvas = rig_canvas.resize((sw, sh), Image.Resampling.BICUBIC)
+
+        # Apply avatar-level rotation
+        if abs(avatar.rotation) > 1e-4:
+            rig_canvas = rig_canvas.rotate(
+                -avatar.rotation, resample=Image.Resampling.BICUBIC, expand=True
+            )
+
+        # Apply avatar-level opacity (fade)
+        if avatar.opacity < 0.999:
+            alpha = max(0.0, min(1.0, avatar.opacity))
+            r, g, b, a = rig_canvas.split()
+            a = a.point(lambda p: int(round(p * alpha)))
+            rig_canvas = Image.merge("RGBA", (r, g, b, a))
+
+        if len(self._rig_cache) >= self._max_rig_cache_size:
+            oldest_key = next(iter(self._rig_cache))
+            del self._rig_cache[oldest_key]
+        self._rig_cache[cache_key] = rig_canvas
+        return rig_canvas
+
+    def render_frame(self, scene_state: SceneState, transparent: bool = False) -> Image.Image:
+        """Render a complete SceneState into a Pillow RGBA image."""
+        bg_rgba = (0, 0, 0, 0) if transparent else (parse_color(scene_state.background) or (0, 0, 0, 0))
+        frame = Image.new("RGBA", (scene_state.width, scene_state.height), bg_rgba)
+
+        for avatar in scene_state.avatars:
+            if avatar.opacity <= 0.0:
+                continue
+            rig_img = self.render_avatar_rig(avatar)
+            # Center rig at (avatar.x, avatar.y)
+            paste_x = int(round(avatar.x - rig_img.width / 2.0))
+            paste_y = int(round(avatar.y - rig_img.height / 2.0))
+
+            # Non-destructive procedural aura layer behind the character
+            if getattr(avatar, "aura", None) and avatar.aura.active and avatar.aura.intensity > 0.001:
+                aura_res = AuraRenderer.render_aura(rig_img, scene_state.timestamp, avatar.aura)
+                if aura_res is not None:
+                    aura_img, off_x, off_y = aura_res
+                    frame.alpha_composite(aura_img, dest=(paste_x + off_x, paste_y + off_y))
+
+            frame.alpha_composite(rig_img, dest=(paste_x, paste_y))
+
+        return frame

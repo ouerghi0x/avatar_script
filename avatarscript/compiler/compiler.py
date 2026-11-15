@@ -1,0 +1,235 @@
+"""Compiler lowering AvatarScript AST into the runtime Intermediate Representation (IR)."""
+from pathlib import Path
+from typing import Dict, Optional
+from avatarscript.parser import AvatarParser
+from avatarscript.ast.nodes import (
+    SceneNode,
+    AvatarNode,
+    ExpressionNode,
+    AnimationNode,
+)
+from avatarscript.compiler.validator import SemanticValidator, AvatarValidationException
+from avatarscript.runtime.scene import Scene
+from avatarscript.runtime.avatar import resolve_named_position
+from avatarscript.runtime.animation import (
+    AvatarTimeline,
+    AnimationEvent,
+    ExpressionEvent,
+    IdleConfig,
+)
+
+
+class AvatarCompiler:
+    def __init__(self, assets_root: Optional[Path] = None):
+        self.parser = AvatarParser()
+        self.validator = SemanticValidator(assets_root=assets_root)
+
+    def compile_source(self, source_text: str) -> Scene:
+        """Parse, validate, and compile an .ava source string into a Scene IR."""
+        ast_scene = self.parser.parse(source_text)
+        errors = self.validator.validate(ast_scene)
+        if errors:
+            raise AvatarValidationException(errors)
+        return self.lower_to_ir(ast_scene)
+
+    def compile_file(self, path: Path) -> Scene:
+        source_text = Path(path).read_text(encoding="utf-8")
+        return self.compile_source(source_text)
+
+    def lower_to_ir(self, ast_scene: SceneNode) -> Scene:
+        width, height = 1920, 1080
+        background = "#202020"
+        fps = 30
+        duration = 10.0
+        output_path: Optional[str] = None
+
+        for prop in ast_scene.properties:
+            if prop.name == "canvas":
+                width, height = prop.value  # type: ignore
+            elif prop.name == "background":
+                background = str(prop.value)
+            elif prop.name == "fps":
+                fps = int(round(float(prop.value)))  # type: ignore
+            elif prop.name == "duration":
+                duration = float(prop.value)  # type: ignore
+            elif prop.name == "render":
+                output_path = str(prop.value)
+
+        avatars: Dict[str, AvatarTimeline] = {}
+        for av_node in ast_scene.avatars:
+            avatars[av_node.identifier] = self._lower_avatar(av_node, width, height)
+
+        return Scene(
+            name=ast_scene.name,
+            width=width,
+            height=height,
+            background=background,
+            fps=fps,
+            duration=duration,
+            output_path=output_path,
+            avatars=avatars,
+        )
+
+    def _lower_avatar(self, av_node: AvatarNode, canvas_w: int, canvas_h: int) -> AvatarTimeline:
+        character = "default"
+        init_x, init_y = resolve_named_position("center", canvas_w, canvas_h)
+        init_scale = 1.0
+        init_rot = 0.0
+
+        for prop in av_node.properties:
+            if prop.name == "character":
+                character = str(prop.value)
+            elif prop.name == "position":
+                if isinstance(prop.value, str):
+                    init_x, init_y = resolve_named_position(prop.value, canvas_w, canvas_h)
+                else:
+                    init_x, init_y = float(prop.value[0]), float(prop.value[1])
+            elif prop.name == "scale":
+                init_scale = float(prop.value)  # type: ignore
+            elif prop.name == "rotation":
+                init_rot = float(prop.value)  # type: ignore
+
+        idle_cfg = IdleConfig()
+        if av_node.idle:
+            idle_cfg = IdleConfig(
+                breathe=av_node.idle.breathe,
+                blink_interval=av_node.idle.blink_interval,
+            )
+
+        expr_events = []
+        anim_events = []
+
+        for tb in sorted(av_node.timeline_blocks, key=lambda b: b.timestamp):
+            for act in tb.actions:
+                if isinstance(act, ExpressionNode):
+                    expr_events.append(
+                        ExpressionEvent(timestamp=tb.timestamp, expression=act.expression)
+                    )
+                elif isinstance(act, AnimationNode):
+                    ev = self._lower_animation(act, tb.timestamp)
+                    anim_events.append(ev)
+
+        return AvatarTimeline(
+            identifier=av_node.identifier,
+            character=character,
+            initial_x=init_x,
+            initial_y=init_y,
+            initial_scale=init_scale,
+            initial_rotation=init_rot,
+            idle=idle_cfg,
+            expressions=expr_events,
+            animations=anim_events,
+        )
+
+    def _lower_animation(self, act: AnimationNode, start_time: float) -> AnimationEvent:
+        dur = act.duration if act.duration is not None else 0.5
+        intensity = act.intensity if act.intensity is not None else 15.0
+
+        target_x = None
+        target_y = None
+        delta_x = None
+        delta_y = None
+        target_scale = None
+        target_rot = None
+        target_opacity = None
+
+        if act.kind == "move":
+            if "to_x" in act.params or "to_y" in act.params:
+                target_x = act.params.get("to_x")
+                target_y = act.params.get("to_y")
+            else:
+                delta_x = act.params.get("x", 0.0)
+                delta_y = act.params.get("y", 0.0)
+        elif act.kind == "scale":
+            target_scale = (
+                act.scalar_target if act.scalar_target is not None else act.params.get("to", 1.0)
+            )
+        elif act.kind == "rotate":
+            target_rot = (
+                act.scalar_target if act.scalar_target is not None else act.params.get("deg", 0.0)
+            )
+        elif act.kind == "fade":
+            target_opacity = (
+                act.scalar_target if act.scalar_target is not None else act.params.get("to", 1.0)
+            )
+        elif act.kind in ("arm", "left_arm", "right_arm"):
+            target_rot = (
+                act.scalar_target if act.scalar_target is not None else (
+                    act.params.get("deg") or act.params.get("angle") or act.intensity
+                )
+            )
+
+        target_arm = None
+        if act.kind == "left_arm":
+            target_arm = "left"
+        elif act.kind == "right_arm":
+            target_arm = "right"
+        elif act.kind == "arm":
+            # Check string param or convention
+            if "left" in act.params:
+                target_arm = "left"
+                target_rot = act.params["left"]
+            elif "right" in act.params:
+                target_arm = "right"
+                target_rot = act.params["right"]
+            else:
+                target_arm = "right"
+
+        aura_active = None
+        aura_color = None
+        aura_intensity = None
+        aura_size = None
+        aura_speed = None
+        aura_sparks = None
+
+        if act.kind == "aura":
+            # If scalar_target is 'none' or 'off' -> deactivate aura
+            raw_target = str(act.scalar_target).lower() if act.scalar_target is not None else ""
+            if raw_target in ("none", "off", "0", "false"):
+                aura_active = False
+            else:
+                aura_active = True
+                if raw_target:
+                    aura_color = raw_target
+
+            if "color" in act.params:
+                aura_color = str(act.params["color"])
+            if "intensity" in act.params:
+                aura_intensity = float(act.params["intensity"])
+            elif act.intensity is not None:
+                aura_intensity = float(act.intensity)
+            if "size" in act.params:
+                aura_size = float(act.params["size"])
+            if "speed" in act.params:
+                aura_speed = float(act.params["speed"])
+            if "sparks" in act.params:
+                sparks_val = act.params["sparks"]
+                if isinstance(sparks_val, bool):
+                    aura_sparks = sparks_val
+                elif isinstance(sparks_val, (int, float)):
+                    aura_sparks = sparks_val > 0
+                else:
+                    aura_sparks = str(sparks_val).lower() not in ("0", "false", "off", "no")
+
+        return AnimationEvent(
+            kind=act.kind,
+            start_time=start_time,
+            duration=dur,
+            easing=act.easing,
+            target_x=target_x,
+            target_y=target_y,
+            delta_x=delta_x,
+            delta_y=delta_y,
+            target_scale=target_scale,
+            target_rotation=target_rot,
+            target_opacity=target_opacity,
+            intensity=intensity,
+            target_arm=target_arm,
+            arm_angle=target_rot,
+            aura_active=aura_active,
+            aura_color=aura_color,
+            aura_intensity=aura_intensity,
+            aura_size=aura_size,
+            aura_speed=aura_speed,
+            aura_sparks=aura_sparks,
+        )
