@@ -1,5 +1,9 @@
 # AvatarScript v0.1
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
+[![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visualstudiocode)](vscode-avatarscript/)
+
 **AvatarScript** is a lightweight, deterministic Domain-Specific Language (DSL) and animation engine written in Python for describing, previewing, and rendering 2D animated reaction avatars for YouTube videos, anime reactions, manhwa narrations, and commentary shorts.
 
 Instead of keyframing every facial change, blink, breathing cycle, or bounce manually in a video editor, creators write declarative `.ava` scripts and compile them directly into H.264 `.mp4` videos or 32-bit RGBA transparent `.png` frame sequences.
@@ -10,9 +14,11 @@ Instead of keyframing every facial change, blink, breathing cycle, or bounce man
 
 - **Genuine Compiler Pipeline**: Indentation-aware `LALR(1)` grammar powered by Lark (`AvatarIndenter` -> `AvatarParser` -> Typed AST with line/column locations -> `SemanticValidator` -> Intermediate Representation).
 - **Deterministic Time-Based Animation Runtime**: `evaluate_at(t)` is a pure function of timestamp $t \in [0, \text{duration}]$. Seeking to `t = 5.0s` directly or rendering sequentially at 30/60 FPS yields bit-identical pixel output.
-- **Snapshot-on-Start Overlapping Channel Resolution**: Independent channels (`x`, `y`, `scale`, `rotation`, `opacity`) animate simultaneously without conflict, while transient effects (`shake`, `bounce`) and idle cycles (`breathe`, `blink`) layer additively.
+- **Snapshot-on-Start Overlapping Channel Resolution**: Independent channels (`x`, `y`, `scale`, `rotation`, `opacity`, `left_arm`, `right_arm`, `aura`) animate simultaneously without conflict, while transient effects (`shake`, `bounce`, `nod`) and idle cycles (`breathe`, `blink`) layer additively.
 - **2× Supersampled Pure-Python Vector SVG Rig**: Renders modular 6-layer characters (`body`, `head`, `left_arm`, `right_arm`, `eyes`, `mouth`) with anti-aliased `LANCZOS` downsampling and quantized rig caching—no external C/Cairo DLL dependencies required.
+- **Procedural Non-Destructive Aura System**: Dragon Ball Z-style energy flames, multi-harmonic plasma noise, white-hot core, and electric lightning arcs rendered directly from the character silhouette without modifying original sprite pixels.
 - **Real-Time Pygame Preview & FFmpeg Export**: Interactive preview window with play/pause/scrub controls, plus direct H.264 (`yuv420p`) MP4 export and transparent RGBA PNG sequence export for NLE overlay workflows.
+- **Interactive VS Code Extension**: Full syntax highlighting, auto-completion snippets, and one-click commands to validate, preview, and render `.ava` scripts without using the terminal.
 
 ---
 
@@ -20,28 +26,14 @@ Instead of keyframing every facial change, blink, breathing cycle, or bounce man
 
 ```text
 avatarscript/
-├── examples/
-│   ├── basic_reaction.ava              # Minimal 6s 1280x720 reaction example
-│   ├── anime_reaction.ava              # Full 12s 1920x1080 widescreen reaction example
-│   ├── manhwa_commentary_shorts.ava    # Vertical 10s 1080x1920 @ 60 FPS Shorts example
-│   └── phase1_demo.py                  # Programmatic runtime/renderer API demo
+├── .github/
+│   └── workflows/
+│       └── ci.yml                      # GitHub Actions automated test matrix
 ├── assets/
 │   └── characters/
-│       └── default/                    # Modular 400x500 SVG character rig (14 assets)
-│           ├── head.svg
-│           ├── body.svg
-│           ├── left_arm.svg
-│           ├── right_arm.svg
-│           ├── eyes_open.svg
-│           ├── eyes_closed.svg
-│           ├── eyes_angry.svg
-│           ├── eyes_shocked.svg
-│           ├── mouth_neutral.svg
-│           ├── mouth_happy.svg
-│           ├── mouth_surprised.svg
-│           ├── mouth_sad.svg
-│           ├── mouth_angry.svg
-│           └── mouth_shocked.svg
+│       ├── default/                    # Standard blue hoodie narrator rig
+│       ├── ninja/                      # Shinobi with stealth hood and headband
+│       └── demon/                      # Horned crimson warrior with dark armor
 ├── avatarscript/
 │   ├── grammar.lark                    # LALR(1) indentation-based grammar specification
 │   ├── lexer.py                        # AvatarIndenter post-lexer
@@ -60,11 +52,22 @@ avatarscript/
 │   │   ├── interpolation.py            # linear, ease_in, ease_out, ease_in_out, lerp
 │   │   └── timeline.py                 # Frame timestamp generator
 │   ├── renderer/
+│   │   ├── aura_renderer.py            # Procedural energy aura & lightning generator
 │   │   ├── frame_renderer.py           # SVGRasterizer & cached FrameRenderer
 │   │   ├── preview.py                  # Real-time Pygame preview window
 │   │   └── video_exporter.py           # FFmpeg MP4 pipe & RGBA PNG sequence exporter
 │   └── cli.py                          # Command-line interface (`avatarscript`)
-├── tests/                              # Comprehensive pytest suite (Phases 1–5)
+├── examples/
+│   ├── basic_reaction.ava              # Minimal 6s 1280x720 reaction example
+│   ├── anime_reaction.ava              # Full 12s 1920x1080 widescreen reaction example
+│   ├── manhwa_commentary_shorts.ava    # Vertical 10s 1080x1920 @ 60 FPS Shorts example
+│   ├── arm_control_and_characters.ava  # Arm control and multi-character showcase
+│   ├── super_saiyan_aura.ava           # Dragon Ball Z Ki aura & power-up showcase
+│   └── phase1_demo.py                  # Programmatic runtime/renderer API demo
+├── tests/                              # Comprehensive pytest suite (19 unit tests)
+├── vscode-avatarscript/                # Official VS Code extension
+├── LANGUAGE_GUIDE.md                   # Complete in-depth language manual
+├── LICENSE                             # MIT License
 ├── pyproject.toml
 └── requirements.txt
 ```
@@ -87,6 +90,7 @@ python -m venv avatarscript\.venv
 ## 4. Command-Line Usage (`avatarscript`)
 
 ### Validate an `.ava` script
+
 Checks syntax and semantic rules (undefined character assets, invalid expressions, out-of-range timestamps, duplicate properties) and prints source-line caret diagnostics on failure:
 
 ```powershell
@@ -94,7 +98,9 @@ Checks syntax and semantic rules (undefined character assets, invalid expression
 ```
 
 ### Real-time Interactive Preview
+
 Opens a Pygame window displaying the animated scene in real time:
+
 - **`SPACE`**: Play / Pause
 - **`R`**: Restart from `0.0s`
 - **`LEFT` / `RIGHT`**: Scrub backward / forward by `0.5s`
@@ -105,6 +111,7 @@ Opens a Pygame window displaying the animated scene in real time:
 ```
 
 ### Render to MP4 Video
+
 Renders the scene to an H.264 (`yuv420p`) `.mp4` file ready for YouTube or video editors:
 
 ```powershell
@@ -112,13 +119,14 @@ Renders the scene to an H.264 (`yuv420p`) `.mp4` file ready for YouTube or video
 ```
 
 ### Export Transparent PNG Sequence
+
 Exports numbered 32-bit RGBA `.png` frames (`frame_00000.png`, ...) with a transparent background so you can overlay the reaction avatar on top of gameplay or manhwa footage in Premiere Pro, DaVinci Resolve, CapCut, or FFmpeg:
 
 ```powershell
 & "avatarscript\.venv\Scripts\avatarscript.exe" export-frames avatarscript\examples\basic_reaction.ava -o frames_out
 ```
 
-*(Pass `--opaque` to bake the scene's hex background color into the PNG frames instead of transparency.)*
+_(Pass `--opaque` to bake the scene's hex background color into the PNG frames instead of transparency.)_
 
 ---
 
@@ -165,28 +173,33 @@ scene "anime_reaction":
 ```
 
 ### Scene Properties
-| Property | Syntax Example | Description |
-| :--- | :--- | :--- |
-| `canvas` | `canvas 1920x1080` | Output resolution in pixels (`WIDTHxHEIGHT`, must be positive integers). |
-| `background` | `background "#202020"` | Hex color string (`#RGB`, `#RRGGBB`, or `#RRGGBBAA`). |
-| `fps` | `fps 30` | Frame rate (`1` to `240` frames per second). |
-| `duration` | `duration 12s` | Total scene duration in seconds (`s` suffix optional). |
-| `render` | `render "output.mp4"` | Default output file path when `avatarscript render` is called without `-o`. |
+
+| Property     | Syntax Example         | Description                                                                 |
+| :----------- | :--------------------- | :-------------------------------------------------------------------------- |
+| `canvas`     | `canvas 1920x1080`     | Output resolution in pixels (`WIDTHxHEIGHT`, must be positive integers).    |
+| `background` | `background "#202020"` | Hex color string (`#RGB`, `#RRGGBB`, or `#RRGGBBAA`).                       |
+| `fps`        | `fps 30`               | Frame rate (`1` to `240` frames per second).                                |
+| `duration`   | `duration 12s`         | Total scene duration in seconds (`s` suffix optional).                      |
+| `render`     | `render "output.mp4"`  | Default output file path when `avatarscript render` is called without `-o`. |
 
 ### Avatar Properties
-| Property | Syntax Example | Description |
-| :--- | :--- | :--- |
-| `character` | `character "default"` | Required folder name under `assets/characters/<name>/`. |
-| `position` | `position right` or `position x:500 y:600` | Initial anchor position (`left`, `center`, `right`, or explicit pixel coordinates). |
-| `scale` | `scale 1.2` | Initial uniform scale multiplier (`> 0`). |
-| `rotation` | `rotation -5` | Initial rotation angle in degrees (clockwise positive). |
+
+| Property    | Syntax Example                             | Description                                                                         |
+| :---------- | :----------------------------------------- | :---------------------------------------------------------------------------------- |
+| `character` | `character "default"`                      | Required folder name under `assets/characters/<name>/`.                             |
+| `position`  | `position right` or `position x:500 y:600` | Initial anchor position (`left`, `center`, `right`, or explicit pixel coordinates). |
+| `scale`     | `scale 1.2`                                | Initial uniform scale multiplier (`> 0`).                                           |
+| `rotation`  | `rotation -5`                              | Initial rotation angle in degrees (clockwise positive).                             |
 
 ### Idle Behaviors (`idle:`)
+
 - `breathe`: Continuous chest/head sinusoidal breathing oscillation.
 - `blink every 4s`: Periodic 150ms eye-blink swap to `eyes_closed.svg` every $N$ seconds (must be `> 0.15s`).
 
 ### Facial Expressions (`expression <name>`)
+
 Supported built-in expressions (instantaneously swaps the `eyes` and `mouth` rig layers at the block timestamp):
+
 - `neutral` (`eyes_open.svg` + `mouth_neutral.svg`)
 - `happy` (`eyes_open.svg` + `mouth_happy.svg`)
 - `sad` (`eyes_open.svg` + `mouth_sad.svg`)
@@ -196,21 +209,24 @@ Supported built-in expressions (instantaneously swaps the `eyes` and `mouth` rig
 - `smirk` (`eyes_open.svg` + `mouth_smirk.svg`)
 
 ### Animations & Easing Functions
+
 Animations can be written using either `animate <kind> ...` or direct shorthand commands inside any `at <time>s:` block:
 
-| Animation | Syntax Examples | Effect |
-| :--- | :--- | :--- |
-| `shake` | `animate shake duration 0.4s` / `animate shake duration 0.4s intensity 18` | Damped horizontal oscillation that returns cleanly to `0` at completion. |
-| `bounce` | `animate bounce duration 0.6s easing ease_out` | Vertical jump arc (`-|sin(2πp)|`) with subtle squash-and-stretch. |
-| `nod` | `animate nod duration 0.4s intensity 12` / `nod duration 0.35s` | Transient head nod / torso pitch downward returning to resting angle. |
-| `left_arm` | `left_arm 45 duration 0.3s easing ease_out` | Rotates left arm around anatomical shoulder socket `(95, 265)`. |
-| `right_arm` | `right_arm -80 duration 0.35s easing ease_out` | Rotates right arm around anatomical shoulder socket `(305, 265)`. |
-| `move` | `move x:30 y:-10 duration 0.3s` / `move to_x:960 to_y:540 duration 0.5s` | Relative offset (`x:`, `y:`) or absolute canvas target (`to_x:`, `to_y:`). |
-| `scale` | `scale 1.35 duration 0.4s easing elastic_out` | Smoothly interpolates avatar scale to target multiplier. |
-| `rotate` | `rotate 15 duration 0.3s easing ease_out` | Smoothly interpolates avatar rotation (degrees). |
-| `fade` | `fade 0.0 duration 0.5s easing ease_in` | Smoothly interpolates avatar opacity (`0.0` transparent to `1.0` opaque). |
+| Animation   | Syntax Examples                                                            | Effect                                                                     |
+| :---------- | :------------------------------------------------------------------------- | :------------------------------------------------------------------------- |
+| `shake`     | `animate shake duration 0.4s` / `shake intensity:18 duration 0.4s`         | Damped horizontal oscillation that returns cleanly to `0` at completion.   |
+| `bounce`    | `animate bounce duration 0.6s easing ease_out` / `bounce intensity:15`    | Vertical jump arc with smooth squash-and-stretch.                          |
+| `nod`       | `animate nod duration 0.4s intensity 12` / `nod duration 0.35s`            | Transient head nod / torso pitch downward returning to resting angle.      |
+| `left_arm`  | `left_arm 45 duration 0.3s easing ease_out`                                | Rotates left arm around anatomical shoulder socket `(95, 265)`.            |
+| `right_arm` | `right_arm -80 duration 0.35s easing ease_out`                             | Rotates right arm around anatomical shoulder socket `(305, 265)`.          |
+| `aura`      | `aura gold size:60 intensity:2.0 sparks:1 duration 0.3s`                   | Dynamic procedural Ki energy aura with rising flames and lightning arcs.   |
+| `move`      | `move x:30 y:-10 duration 0.3s` / `move to_x:960 to_y:540 duration 0.5s`   | Relative offset (`x:`, `y:`) or absolute canvas target (`to_x:`, `to_y:`). |
+| `scale`     | `scale 1.35 duration 0.4s easing elastic_out`                              | Smoothly interpolates avatar scale to target multiplier.                   |
+| `rotate`    | `rotate 15 duration 0.3s easing ease_out`                                  | Smoothly interpolates avatar rotation (degrees).                           |
+| `fade`      | `fade 0.0 duration 0.5s easing ease_in`                                    | Smoothly interpolates avatar opacity (`0.0` transparent to `1.0` opaque).  |
 
 **Supported Easing Functions (`easing <name>`)**:
+
 - `linear` (default)
 - `ease_in` (quadratic $t^2$)
 - `ease_out` (quadratic $t(2 - t)$)
@@ -222,11 +238,13 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 ## 6. Built-in Characters & Creating Custom Characters
 
 AvatarScript includes **3 built-in character models** ready for use:
+
 - **`default`**: Standard blue hoodie narrator.
 - **`ninja`**: Dark shinobi gi with crimson belt, stealth hood, and headband plate.
 - **`demon`**: Crimson skin, horns, rune mark, dark armor, and claws.
 
 To add a new character named `"hero"`, create `assets/characters/hero/` containing SVG files with `viewBox="0 0 400 500"`:
+
 - Base rig layers: `body.svg`, `head.svg`, `left_arm.svg`, `right_arm.svg`
 - Eye layers: `eyes_open.svg`, `eyes_closed.svg`, `eyes_angry.svg`, `eyes_shocked.svg`
 - Mouth layers: `mouth_neutral.svg`, `mouth_happy.svg`, `mouth_sad.svg`, `mouth_angry.svg`, `mouth_surprised.svg`, `mouth_shocked.svg`, `mouth_smirk.svg`
