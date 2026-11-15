@@ -1,8 +1,92 @@
-# AvatarScript v0.1
+<p align="center">
+  <img src="assets/branding/logo.png" alt="AvatarScript Logo" width="160" />
+</p>
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python Version](https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org/)
-[![VS Code](https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visualstudiocode)](vscode-avatarscript/)
+<h1 align="center">AvatarScript</h1>
+
+<p align="center">
+  <strong>A deterministic animation engine & domain-specific language for 2D reaction avatars, VTubers, and commentary videos.</strong>
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue" alt="Python Version" /></a>
+  <a href="vscode-avatarscript/"><img src="https://img.shields.io/badge/VS%20Code-Extension-007ACC?logo=visualstudiocode" alt="VS Code Extension" /></a>
+</p>
+
+---
+
+## Showcase Demo: Dragon Ball Z Energy Aura Power-Up
+
+AvatarScript allows creators to write declarative animation timelines that compile directly into production-grade video. Below is our latest demo showcasing **procedural Ki energy charging, upward rising flames, Super Saiyan gold transformation, and electric lightning arcs** with 100% non-destructive character preservation:
+
+<p align="center">
+  <img src="examples/super_saiyan_aura.gif" alt="Super Saiyan Aura Power-Up Demo" width="720" />
+</p>
+
+<details>
+<summary><b>View the complete <code>.ava</code> script for this scene</b></summary>
+
+```ava
+# Dragon Ball Z Power-Up Aura Showcase
+# Demonstrates blue ki charge followed by Super Saiyan gold aura with lightning arcs
+
+scene "Super Saiyan Power Up":
+    canvas 1920x1080
+    background "#101018"
+    fps 30
+    duration 6.0s
+    render "super_saiyan_aura.mp4"
+
+    avatar "Goku":
+        character "ninja"
+        position center
+        scale 1.25
+
+        idle:
+            breathe
+            blink every 3.5s
+
+        at 0.0s:
+            expression neutral
+
+        # 1. Start charging Ki: calm blue aura
+        at 1.0s:
+            expression angry
+            aura blue size:25 intensity:0.8 speed:1.2 sparks:0 duration 0.5s
+            shake intensity:4 duration 1.0s
+
+        # 2. Power rising: aura intensifies
+        at 2.0s:
+            aura cyan size:40 intensity:1.5 speed:1.8 sparks:1 duration 0.5s
+            shake intensity:8 duration 1.0s
+            right_arm deg:-25 duration 0.3s
+            left_arm deg:25 duration 0.3s
+
+        # 3. Super Saiyan Explosion: Explosive Gold Aura with electric sparks & screen shake
+        at 3.0s:
+            expression shocked
+            aura gold size:65 intensity:2.2 speed:2.5 sparks:1 duration 0.2s
+            bounce intensity:18 duration 0.6s
+            shake intensity:22 duration 1.5s
+            scale 1.35 duration 0.3s easing elastic_out
+
+        # 4. Sustained Super Saiyan state: bright golden aura stabilized
+        at 4.5s:
+            expression smirk
+            aura gold size:48 intensity:1.6 speed:1.5 sparks:1 duration 0.5s
+            scale 1.25 duration 0.5s easing ease_in_out
+            right_arm deg:0 duration 0.5s
+            left_arm deg:0 duration 0.5s
+
+        # 5. Power down: aura vanishes cleanly
+        at 5.5s:
+            expression neutral
+            aura none duration 0.3s
+```
+</details>
+
+---
 
 **AvatarScript** is a lightweight, deterministic Domain-Specific Language (DSL) and animation engine written in Python for describing, previewing, and rendering 2D animated reaction avatars for YouTube videos, anime reactions, manhwa narrations, and commentary shorts.
 
