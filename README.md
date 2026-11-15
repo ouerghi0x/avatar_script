@@ -258,3 +258,53 @@ Supported SVG primitives in the built-in supersampled vector rasterizer: `<rect>
 ```powershell
 & "avatarscript\.venv\Scripts\pytest.exe" "avatarscript\tests" -v
 ```
+
+---
+
+## 8. Upcoming Roadmap & Next Features
+
+We have a clear, modular roadmap for expanding AvatarScript into a comprehensive declarative 2D animation ecosystem:
+
+### 1. Audio-Driven Viseme Lip-Sync (`talk` / `speech`)
+- **Speech Audio Alignment**: Direct integration with audio files (`.wav`, `.mp3`) and timestamped transcript groups (such as Whisper word-level alignments or ElevenLabs character timings).
+- **Phoneme-to-Viseme Mapping**: Automatic switching across standard viseme shapes (`mouth_A`, `mouth_O`, `mouth_E`, `mouth_L`, `mouth_rest`) synchronized with syllable amplitudes and speech cadences:
+  ```ava
+  at 2.0s:
+      talk audio:"voice_intro.mp3" transcript:"Welcome back to the channel!"
+      # Or simple procedural chatter:
+      talk duration 2.5s speed:1.2
+  ```
+
+### 2. Camera System (`camera` / Viewport Transforms)
+- Declarative virtual camera supporting pan, zoom, screen-shake punch-ins, and cinematic tracking between avatars:
+  ```ava
+  camera:
+      pan to_x:1200 to_y:600 duration 1.0s easing ease_in_out
+      zoom 1.4 duration 0.5s easing elastic_out
+  ```
+
+### 3. Manga & Comic Visual FX Layer (`fx`)
+- **Action Lines & Speed Streaks**: Radial zoom lines and horizontal speed stripes for sudden shock or power bursts.
+- **Anime Sweat Drops, Anger Veins & Question Marks**: Pop-up comic iconography floating above the avatar's head:
+  ```ava
+  at 4.0s:
+      fx sweat_drop position:head_right duration 1.5s
+      fx speed_lines intensity:0.8 duration 0.5s
+  ```
+
+### 4. Interactive Prop & Item Rigging (`hold` / `prop`)
+- Attaching SVG props directly to arm/hand sockets (`sword`, `microphone`, `controller`, `phone`):
+  ```ava
+  avatar "player":
+      hold item:"microphone" hand:right
+  ```
+
+### 5. Multi-Track Audio Mixing (`audio` / `bgm` / `sfx`)
+- Declaring background music and synchronized sound effects directly in the script with automated ducking when avatars speak:
+  ```ava
+  scene "podcast":
+      bgm "lofi_beat.mp3" volume:0.25 loop:true
+      at 3.5s:
+          sfx "impact_punch.wav" volume:0.8
+  ```
+
