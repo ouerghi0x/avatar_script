@@ -21,7 +21,7 @@
 AvatarScript allows creators to write declarative animation timelines that compile directly into production-grade video. Below is our latest demo showcasing **procedural Ki energy charging, upward rising flames, Super Saiyan gold transformation, and electric lightning arcs** with 100% non-destructive character preservation:
 
 <p align="center">
-  <img src="examples/super_saiyan_aura.gif" alt="Super Saiyan Aura Power-Up Demo" width="720" />
+  <img src="assets/branding/super_saiyan_aura.gif" alt="Super Saiyan Aura Power-Up Demo" width="720" />
 </p>
 
 <details>
