@@ -319,21 +319,28 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 
 ---
 
-## 6. Built-in Characters & Creating Custom Characters
+## 6. Built-in Characters & Interactive Props
 
+### Built-in Characters
 AvatarScript includes **3 built-in character models** ready for use:
 
 - **`default`**: Standard blue hoodie narrator.
 - **`ninja`**: Dark shinobi gi with crimson belt, stealth hood, and headband plate.
 - **`demon`**: Crimson skin, horns, rune mark, dark armor, and claws.
 
-To add a new character named `"hero"`, create `assets/characters/hero/` containing SVG files with `viewBox="0 0 400 500"`:
+### Interactive Props & Item Rigging (`hold`)
+Characters can hold and swap vector props in their left or right hands. Props automatically attach to the anatomical hand socket and smoothly follow shoulder/arm rotations:
 
-- Base rig layers: `body.svg`, `head.svg`, `left_arm.svg`, `right_arm.svg`
-- Eye layers: `eyes_open.svg`, `eyes_closed.svg`, `eyes_angry.svg`, `eyes_shocked.svg`
-- Mouth layers: `mouth_neutral.svg`, `mouth_happy.svg`, `mouth_sad.svg`, `mouth_angry.svg`, `mouth_surprised.svg`, `mouth_shocked.svg`, `mouth_smirk.svg`
+- **Built-in Props**: `microphone`, `sword`, `controller`, `phone` (or release with `none`)
+- **Syntax**:
+  ```ava
+  avatar "player":
+      hold item:"microphone" hand:right
 
-Supported SVG primitives in the built-in supersampled vector rasterizer: `<rect>` (including rounded `rx`), `<circle>`, `<ellipse>`, `<polygon>`, and `<line>` (including `stroke-linecap="round"`).
+      at 2.0s:
+          hold item:"sword" hand:left
+          hold item:"none" hand:right
+  ```
 
 ---
 
@@ -376,14 +383,7 @@ We have a clear, modular roadmap for expanding AvatarScript into a comprehensive
       fx speed_lines intensity:0.8 duration 0.5s
   ```
 
-### 4. Interactive Prop & Item Rigging (`hold` / `prop`)
-- Attaching SVG props directly to arm/hand sockets (`sword`, `microphone`, `controller`, `phone`):
-  ```ava
-  avatar "player":
-      hold item:"microphone" hand:right
-  ```
-
-### 5. Multi-Track Audio Mixing (`audio` / `bgm` / `sfx`)
+### 4. Multi-Track Audio Mixing (`audio` / `bgm` / `sfx`)
 - Declaring background music and synchronized sound effects directly in the script with automated ducking when avatars speak:
   ```ava
   scene "podcast":

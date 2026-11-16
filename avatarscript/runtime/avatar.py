@@ -18,6 +18,7 @@ class LayerState:
     rotation_center: Tuple[float, float] = (200.0, 250.0)
     visible: bool = True
     opacity: float = 1.0
+    is_prop: bool = False
 
 
 @dataclass
@@ -53,8 +54,10 @@ def build_default_layers(
     breathe_scale_y: float = 1.0,
     left_arm_rot: float = 0.0,
     right_arm_rot: float = 0.0,
+    left_prop: str = "none",
+    right_prop: str = "none",
 ) -> List[LayerState]:
-    """Construct the ordered 6-layer rig for a character at a specific state."""
+    """Construct the ordered layer rig for a character at a specific state."""
     expr_assets = resolve_expression_assets(expression, is_blinking=is_blinking)
     layers = [
         LayerState(
@@ -78,4 +81,35 @@ def build_default_layers(
         LayerState(name="eyes", asset_filename=expr_assets.eyes_asset, z_order=40, y=breathe_offset_y),
         LayerState(name="mouth", asset_filename=expr_assets.mouth_asset, z_order=50, y=breathe_offset_y),
     ]
+
+    # Attach left hand prop if equipped
+    if left_prop and left_prop.lower() not in ("none", "off"):
+        layers.append(
+            LayerState(
+                name="prop_left",
+                asset_filename=f"{left_prop}.svg",
+                z_order=12,
+                x=0.0,
+                y=breathe_offset_y * 0.6,
+                rotation=left_arm_rot,
+                rotation_center=(95.0, 265.0),
+                is_prop=True,
+            )
+        )
+
+    # Attach right hand prop if equipped
+    if right_prop and right_prop.lower() not in ("none", "off"):
+        layers.append(
+            LayerState(
+                name="prop_right",
+                asset_filename=f"{right_prop}.svg",
+                z_order=60,  # Render on top of right arm/hand
+                x=0.0,
+                y=breathe_offset_y * 0.6,
+                rotation=right_arm_rot,
+                rotation_center=(305.0, 265.0),
+                is_prop=True,
+            )
+        )
+
     return sorted(layers, key=lambda l: l.z_order)

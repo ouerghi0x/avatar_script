@@ -11,6 +11,7 @@ from avatarscript.ast.nodes import (
     TimelineBlockNode,
     ExpressionNode,
     AnimationNode,
+    HoldNode,
 )
 
 
@@ -83,7 +84,7 @@ class ASTBuilder(Transformer):
         timeline_blocks: List[TimelineBlockNode] = []
 
         for item in children[1:]:
-            if isinstance(item, AvatarPropertyNode):
+            if isinstance(item, (AvatarPropertyNode, HoldNode)):
                 props.append(item)
             elif isinstance(item, IdleBlockNode):
                 idle_node = item
@@ -127,6 +128,30 @@ class ASTBuilder(Transformer):
             loc=_loc_from_meta(meta), name="rotation", value=float(str(children[0]))
         )
 
+    def hold_stmt(self, meta: Any, children: List[Any]) -> HoldNode:
+        item = "microphone"
+        hand = "right"
+        for kind, val in children:
+            if kind == "item":
+                item = val
+            elif kind == "hand":
+                hand = val
+            elif kind == "val":
+                if val in ("left", "right"):
+                    hand = val
+                else:
+                    item = val
+        return AvatarPropertyNode(loc=_loc_from_meta(meta), name="hold", value=(item, hand))
+
+    def hold_item(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
+        return ("item", _strip_quotes(str(children[0])))
+
+    def hold_hand(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
+        return ("hand", _strip_quotes(str(children[0])).lower())
+
+    def hold_val(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
+        return ("val", _strip_quotes(str(children[0])).lower())
+
     def idle_block(self, meta: Any, children: List[Any]) -> IdleBlockNode:
         breathe = False
         blink_interval = None
@@ -149,7 +174,9 @@ class ASTBuilder(Transformer):
 
     def timeline_block(self, meta: Any, children: List[Any]) -> TimelineBlockNode:
         ts = _parse_time(str(children[0]))
-        actions = [c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode))]
+        actions = [
+            c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode, AvatarPropertyNode))
+        ]
         return TimelineBlockNode(loc=_loc_from_meta(meta), timestamp=ts, actions=actions)
 
     def expression_stmt(self, meta: Any, children: List[Any]) -> ExpressionNode:

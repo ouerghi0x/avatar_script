@@ -40,6 +40,13 @@ class ExpressionEvent:
 
 
 @dataclass
+class HoldEvent:
+    timestamp: float
+    item: str
+    hand: str = "right"  # 'left' or 'right'
+
+
+@dataclass
 class IdleConfig:
     breathe: bool = False
     blink_interval: Optional[float] = None  # seconds, e.g. 4.0
@@ -101,8 +108,11 @@ class AvatarTimeline:
     initial_rotation: float = 0.0
     initial_opacity: float = 1.0
     initial_expression: str = "neutral"
+    initial_left_prop: str = "none"
+    initial_right_prop: str = "none"
     idle: IdleConfig = field(default_factory=IdleConfig)
     expressions: List[ExpressionEvent] = field(default_factory=list)
+    hold_events: List[HoldEvent] = field(default_factory=list)
     animations: List[AnimationEvent] = field(default_factory=list)
 
     def evaluate_at(self, t: float) -> AvatarState:
@@ -202,6 +212,18 @@ class AvatarTimeline:
             if cycle_pos >= (self.idle.blink_interval - self.idle.blink_duration):
                 is_blinking = True
 
+        # Resolve held props (latest hold events with timestamp <= t)
+        left_prop = self.initial_left_prop
+        right_prop = self.initial_right_prop
+        for hev in sorted(self.hold_events, key=lambda h: h.timestamp):
+            if hev.timestamp <= t + 1e-9:
+                if hev.hand == "left":
+                    left_prop = hev.item
+                elif hev.hand == "right":
+                    right_prop = hev.item
+            else:
+                break
+
         layers = build_default_layers(
             expression=expr,
             is_blinking=is_blinking,
@@ -209,6 +231,8 @@ class AvatarTimeline:
             breathe_scale_y=breathe_scale_y,
             left_arm_rot=left_arm_rot,
             right_arm_rot=right_arm_rot,
+            left_prop=left_prop,
+            right_prop=right_prop,
         )
 
         # 5. Resolve Aura State

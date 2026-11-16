@@ -29,7 +29,19 @@ class AnimationNode(ASTNode):
     scalar_target: Optional[Union[float, str]] = None
 
 
-ActionNode = Union[ExpressionNode, AnimationNode]
+@dataclass
+class HoldNode(ASTNode):
+    item: str
+    hand: str = "right"  # 'left' or 'right'
+
+
+@dataclass
+class AvatarPropertyNode(ASTNode):
+    name: str
+    value: Union[str, float, Tuple[float, float], Tuple[str, str]]
+
+
+ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode]
 
 
 @dataclass
@@ -42,12 +54,6 @@ class TimelineBlockNode(ASTNode):
 class IdleBlockNode(ASTNode):
     breathe: bool = False
     blink_interval: Optional[float] = None
-
-
-@dataclass
-class AvatarPropertyNode(ASTNode):
-    name: str
-    value: Union[str, float, Tuple[float, float]]
 
 
 @dataclass

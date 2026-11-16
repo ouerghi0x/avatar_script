@@ -23,6 +23,7 @@ avatar_def: "avatar" STRING ":" _NL _INDENT avatar_item+ _DEDENT
             | position_stmt
             | scale_prop_stmt
             | rotation_prop_stmt
+            | hold_stmt
             | idle_block
             | timeline_block
 
@@ -30,6 +31,13 @@ character_stmt: "character" STRING _NL
 position_stmt: "position" position_spec _NL
 scale_prop_stmt: "scale" SIGNED_NUMBER _NL
 rotation_prop_stmt: "rotation" SIGNED_NUMBER _NL
+hold_stmt: "hold" hold_param+ _NL
+
+?hold_param: "item" ":" (STRING | NAME) -> hold_item
+           | "hand" ":" (STRING | NAME) -> hold_hand
+           | "item" (STRING | NAME)     -> hold_item
+           | "hand" (STRING | NAME)     -> hold_hand
+           | (STRING | NAME)            -> hold_val
 
 ?position_spec: NAME -> named_pos
               | coord_pair -> coord_pos
@@ -49,6 +57,7 @@ timeline_block: "at" TIME ":" _NL _INDENT action_stmt+ _DEDENT
 ?action_stmt: expression_stmt
             | animate_stmt
             | direct_transform_stmt
+            | hold_stmt
 
 expression_stmt: "expression" NAME _NL
 animate_stmt: "animate" NAME anim_param* _NL

@@ -5,6 +5,7 @@ from avatarscript.parser import AvatarParser
 from avatarscript.ast.nodes import (
     SceneNode,
     AvatarNode,
+    AvatarPropertyNode,
     ExpressionNode,
     AnimationNode,
 )
@@ -15,6 +16,7 @@ from avatarscript.runtime.animation import (
     AvatarTimeline,
     AnimationEvent,
     ExpressionEvent,
+    HoldEvent,
     IdleConfig,
 )
 
@@ -75,6 +77,8 @@ class AvatarCompiler:
         init_x, init_y = resolve_named_position("center", canvas_w, canvas_h)
         init_scale = 1.0
         init_rot = 0.0
+        init_left_prop = "none"
+        init_right_prop = "none"
 
         for prop in av_node.properties:
             if prop.name == "character":
@@ -88,6 +92,12 @@ class AvatarCompiler:
                 init_scale = float(prop.value)  # type: ignore
             elif prop.name == "rotation":
                 init_rot = float(prop.value)  # type: ignore
+            elif prop.name == "hold":
+                item_name, hand_name = prop.value  # type: ignore
+                if hand_name == "left":
+                    init_left_prop = item_name
+                else:
+                    init_right_prop = item_name
 
         idle_cfg = IdleConfig()
         if av_node.idle:
@@ -98,12 +108,18 @@ class AvatarCompiler:
 
         expr_events = []
         anim_events = []
+        hold_events = []
 
         for tb in sorted(av_node.timeline_blocks, key=lambda b: b.timestamp):
             for act in tb.actions:
                 if isinstance(act, ExpressionNode):
                     expr_events.append(
                         ExpressionEvent(timestamp=tb.timestamp, expression=act.expression)
+                    )
+                elif isinstance(act, AvatarPropertyNode) and act.name == "hold":
+                    item_name, hand_name = act.value  # type: ignore
+                    hold_events.append(
+                        HoldEvent(timestamp=tb.timestamp, item=item_name, hand=hand_name)
                     )
                 elif isinstance(act, AnimationNode):
                     ev = self._lower_animation(act, tb.timestamp)
@@ -116,8 +132,11 @@ class AvatarCompiler:
             initial_y=init_y,
             initial_scale=init_scale,
             initial_rotation=init_rot,
+            initial_left_prop=init_left_prop,
+            initial_right_prop=init_right_prop,
             idle=idle_cfg,
             expressions=expr_events,
+            hold_events=hold_events,
             animations=anim_events,
         )
 

@@ -5,6 +5,7 @@ from typing import List, Optional, Set
 from avatarscript.ast.nodes import (
     SceneNode,
     AvatarNode,
+    AvatarPropertyNode,
     ExpressionNode,
     AnimationNode,
     SourceLocation,
@@ -149,6 +150,24 @@ class SemanticValidator:
                             f"Avatar scale must be positive (got {prop.value})", prop.loc
                         )
                     )
+            elif prop.name == "hold":
+                item_name, hand_name = prop.value  # type: ignore
+                if hand_name not in ("left", "right"):
+                    errors.append(
+                        ValidationError(
+                            f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
+                            prop.loc,
+                        )
+                    )
+                if item_name not in ("none", "off"):
+                    prop_svg = self.assets_root / "props" / f"{item_name}.svg"
+                    if not prop_svg.exists():
+                        errors.append(
+                            ValidationError(
+                                f"Prop '{item_name}' not found in {self.assets_root / 'props'} (e.g. microphone, sword, controller, phone)",
+                                prop.loc,
+                            )
+                        )
 
         if not has_character:
             errors.append(
@@ -188,6 +207,24 @@ class SemanticValidator:
                                 act.loc,
                             )
                         )
+                elif isinstance(act, AvatarPropertyNode) and act.name == "hold":
+                    item_name, hand_name = act.value  # type: ignore
+                    if hand_name not in ("left", "right"):
+                        errors.append(
+                            ValidationError(
+                                f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
+                                act.loc,
+                            )
+                        )
+                    if item_name not in ("none", "off"):
+                        prop_svg = self.assets_root / "props" / f"{item_name}.svg"
+                        if not prop_svg.exists():
+                            errors.append(
+                                ValidationError(
+                                    f"Prop '{item_name}' not found in {self.assets_root / 'props'} (e.g. microphone, sword, controller, phone)",
+                                    act.loc,
+                                )
+                            )
                 elif isinstance(act, AnimationNode):
                     self._validate_animation(act, errors)
 

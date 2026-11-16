@@ -32,14 +32,18 @@ class SVGRasterizer:
         self.assets_root = assets_root
         self._cache: Dict[str, Image.Image] = {}
 
-    def load_layer_image(self, character: str, filename: str) -> Image.Image:
-        cache_key = f"{character}/{filename}"
+    def load_layer_image(self, character: str, filename: str, is_prop: bool = False) -> Image.Image:
+        cache_key = f"prop/{filename}" if is_prop else f"{character}/{filename}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        svg_path = self.assets_root / "characters" / character / filename
+        if is_prop:
+            svg_path = self.assets_root / "props" / filename
+        else:
+            svg_path = self.assets_root / "characters" / character / filename
+
         if not svg_path.exists():
-            raise FileNotFoundError(f"Missing character SVG asset: {svg_path}")
+            raise FileNotFoundError(f"Missing SVG asset: {svg_path}")
 
         img = self.rasterize_svg(svg_path)
         self._cache[cache_key] = img
@@ -165,6 +169,35 @@ class FrameRenderer:
         for layer in sorted(avatar.layers, key=lambda l: l.z_order):
             if not layer.visible or layer.opacity <= 0.0:
                 continue
+
+            if getattr(layer, "is_prop", False):
+                base_prop = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename, is_prop=True)
+                # Socket hand coordinate: left arm socket is (82, 330), right arm socket is (318, 330)
+                is_right = "right" in layer.name
+                hx, hy = (318.0, 330.0) if is_right else (82.0, 330.0)
+                
+                # Scale prop to fit hand proportionally (around 70x70 bounding box)
+                max_dim = max(base_prop.width, base_prop.height)
+                prop_scale = 75.0 / max_dim if max_dim > 0 else 1.0
+                pw = max(1, int(round(base_prop.width * prop_scale)))
+                ph = max(1, int(round(base_prop.height * prop_scale)))
+                scaled_prop = base_prop.resize((pw, ph), Image.Resampling.BICUBIC)
+
+                # Anchor prop onto rig canvas at hand socket
+                prop_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
+                # Offset so prop's center/grip rests right at hand socket
+                ox = int(round(hx - pw / 2.0))
+                oy = int(round(hy - ph * 0.45))
+                prop_canvas.paste(scaled_prop, (ox, oy), scaled_prop)
+
+                # Apply arm's dynamic rotation around the shoulder pivot socket
+                if abs(layer.rotation) > 1e-4:
+                    prop_canvas = prop_canvas.rotate(
+                        -layer.rotation, resample=Image.Resampling.BICUBIC, center=layer.rotation_center
+                    )
+                rig_canvas.alpha_composite(prop_canvas)
+                continue
+
             base_img = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename)
             layer_img = base_img
 
