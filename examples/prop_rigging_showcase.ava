@@ -12,7 +12,7 @@ scene "Interactive Prop Rigging":
         character "default"
         position left
         scale 1.15
-        hold item:"microphone" hand:right
+        hold item:"microphone" hand:right scale:1.4
 
         idle:
             breathe
@@ -29,7 +29,7 @@ scene "Interactive Prop Rigging":
         # Swap to gaming controller
         at 2.5s:
             right_arm deg:0 duration 0.3s
-            hold item:"controller" hand:right
+            hold item:"controller" hand:right scale:1.3
             expression smirk
 
         at 3.2s:
@@ -41,7 +41,7 @@ scene "Interactive Prop Rigging":
         character "ninja"
         position right
         scale 1.15
-        hold item:"sword" hand:right
+        hold item:"sword" hand:right scale:1.5
 
         idle:
             breathe
@@ -60,6 +60,6 @@ scene "Interactive Prop Rigging":
         at 3.0s:
             aura none duration 0.3s
             right_arm deg:0 duration 0.4s
-            hold item:"phone" hand:right
+            hold item:"phone" hand:right scale:1.3
             expression surprised
             left_arm deg:30 duration 0.3s

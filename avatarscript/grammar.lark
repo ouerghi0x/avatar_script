@@ -35,8 +35,10 @@ hold_stmt: "hold" hold_param+ _NL
 
 ?hold_param: "item" ":" (STRING | NAME) -> hold_item
            | "hand" ":" (STRING | NAME) -> hold_hand
+           | "scale" ":" SIGNED_NUMBER  -> hold_scale
            | "item" (STRING | NAME)     -> hold_item
            | "hand" (STRING | NAME)     -> hold_hand
+           | "scale" SIGNED_NUMBER      -> hold_scale
            | (STRING | NAME)            -> hold_val
 
 ?position_spec: NAME -> named_pos

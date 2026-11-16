@@ -38,7 +38,7 @@ class HoldNode(ASTNode):
 @dataclass
 class AvatarPropertyNode(ASTNode):
     name: str
-    value: Union[str, float, Tuple[float, float], Tuple[str, str]]
+    value: Union[str, float, Tuple[float, float], Tuple[str, str], Tuple[str, str, float]]
 
 
 ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode]

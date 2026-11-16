@@ -176,9 +176,12 @@ class FrameRenderer:
                 is_right = "right" in layer.name
                 hx, hy = (318.0, 330.0) if is_right else (82.0, 330.0)
                 
-                # Scale prop to fit hand proportionally (around 70x70 bounding box)
+                # Base scale increased so props are bold and clearly recognizable (140px default)
+                # Multiplied by user-specified layer.scale_x
+                user_scale = layer.scale_x if layer.scale_x > 0 else 1.0
+                base_target_dim = 140.0 * user_scale
                 max_dim = max(base_prop.width, base_prop.height)
-                prop_scale = 75.0 / max_dim if max_dim > 0 else 1.0
+                prop_scale = base_target_dim / max_dim if max_dim > 0 else 1.0
                 pw = max(1, int(round(base_prop.width * prop_scale)))
                 ph = max(1, int(round(base_prop.height * prop_scale)))
                 scaled_prop = base_prop.resize((pw, ph), Image.Resampling.BICUBIC)
@@ -187,7 +190,13 @@ class FrameRenderer:
                 prop_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
                 # Offset so prop's center/grip rests right at hand socket
                 ox = int(round(hx - pw / 2.0))
-                oy = int(round(hy - ph * 0.45))
+                # For sword, the hilt/grip is near the bottom (approx 80% down); for others, near center
+                if "sword" in layer.asset_filename:
+                    oy = int(round(hy - ph * 0.80))
+                elif "mic" in layer.asset_filename:
+                    oy = int(round(hy - ph * 0.60))
+                else:
+                    oy = int(round(hy - ph * 0.50))
                 prop_canvas.paste(scaled_prop, (ox, oy), scaled_prop)
 
                 # Apply arm's dynamic rotation around the shoulder pivot socket

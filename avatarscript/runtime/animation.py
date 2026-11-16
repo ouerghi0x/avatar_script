@@ -44,6 +44,7 @@ class HoldEvent:
     timestamp: float
     item: str
     hand: str = "right"  # 'left' or 'right'
+    scale: float = 1.0
 
 
 @dataclass
@@ -110,6 +111,8 @@ class AvatarTimeline:
     initial_expression: str = "neutral"
     initial_left_prop: str = "none"
     initial_right_prop: str = "none"
+    initial_left_prop_scale: float = 1.0
+    initial_right_prop_scale: float = 1.0
     idle: IdleConfig = field(default_factory=IdleConfig)
     expressions: List[ExpressionEvent] = field(default_factory=list)
     hold_events: List[HoldEvent] = field(default_factory=list)
@@ -215,12 +218,16 @@ class AvatarTimeline:
         # Resolve held props (latest hold events with timestamp <= t)
         left_prop = self.initial_left_prop
         right_prop = self.initial_right_prop
+        left_prop_scale = self.initial_left_prop_scale
+        right_prop_scale = self.initial_right_prop_scale
         for hev in sorted(self.hold_events, key=lambda h: h.timestamp):
             if hev.timestamp <= t + 1e-9:
                 if hev.hand == "left":
                     left_prop = hev.item
+                    left_prop_scale = hev.scale
                 elif hev.hand == "right":
                     right_prop = hev.item
+                    right_prop_scale = hev.scale
             else:
                 break
 
@@ -233,6 +240,8 @@ class AvatarTimeline:
             right_arm_rot=right_arm_rot,
             left_prop=left_prop,
             right_prop=right_prop,
+            left_prop_scale=left_prop_scale,
+            right_prop_scale=right_prop_scale,
         )
 
         # 5. Resolve Aura State

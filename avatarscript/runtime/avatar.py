@@ -56,6 +56,8 @@ def build_default_layers(
     right_arm_rot: float = 0.0,
     left_prop: str = "none",
     right_prop: str = "none",
+    left_prop_scale: float = 1.0,
+    right_prop_scale: float = 1.0,
 ) -> List[LayerState]:
     """Construct the ordered layer rig for a character at a specific state."""
     expr_assets = resolve_expression_assets(expression, is_blinking=is_blinking)
@@ -91,6 +93,8 @@ def build_default_layers(
                 z_order=12,
                 x=0.0,
                 y=breathe_offset_y * 0.6,
+                scale_x=left_prop_scale,
+                scale_y=left_prop_scale,
                 rotation=left_arm_rot,
                 rotation_center=(95.0, 265.0),
                 is_prop=True,
@@ -106,6 +110,8 @@ def build_default_layers(
                 z_order=60,  # Render on top of right arm/hand
                 x=0.0,
                 y=breathe_offset_y * 0.6,
+                scale_x=right_prop_scale,
+                scale_y=right_prop_scale,
                 rotation=right_arm_rot,
                 rotation_center=(305.0, 265.0),
                 is_prop=True,

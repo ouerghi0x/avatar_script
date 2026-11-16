@@ -151,11 +151,21 @@ class SemanticValidator:
                         )
                     )
             elif prop.name == "hold":
-                item_name, hand_name = prop.value  # type: ignore
+                hold_val = prop.value
+                item_name = hold_val[0]
+                hand_name = hold_val[1]
+                item_scale = hold_val[2] if len(hold_val) > 2 else 1.0
                 if hand_name not in ("left", "right"):
                     errors.append(
                         ValidationError(
                             f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
+                            prop.loc,
+                        )
+                    )
+                if item_scale <= 0:
+                    errors.append(
+                        ValidationError(
+                            f"Prop scale must be positive (got {item_scale})",
                             prop.loc,
                         )
                     )
@@ -208,11 +218,21 @@ class SemanticValidator:
                             )
                         )
                 elif isinstance(act, AvatarPropertyNode) and act.name == "hold":
-                    item_name, hand_name = act.value  # type: ignore
+                    hold_val = act.value
+                    item_name = hold_val[0]
+                    hand_name = hold_val[1]
+                    item_scale = hold_val[2] if len(hold_val) > 2 else 1.0
                     if hand_name not in ("left", "right"):
                         errors.append(
                             ValidationError(
                                 f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
+                                act.loc,
+                            )
+                        )
+                    if item_scale <= 0:
+                        errors.append(
+                            ValidationError(
+                                f"Prop scale must be positive (got {item_scale})",
                                 act.loc,
                             )
                         )

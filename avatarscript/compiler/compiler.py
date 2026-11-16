@@ -79,6 +79,8 @@ class AvatarCompiler:
         init_rot = 0.0
         init_left_prop = "none"
         init_right_prop = "none"
+        init_left_prop_scale = 1.0
+        init_right_prop_scale = 1.0
 
         for prop in av_node.properties:
             if prop.name == "character":
@@ -93,11 +95,16 @@ class AvatarCompiler:
             elif prop.name == "rotation":
                 init_rot = float(prop.value)  # type: ignore
             elif prop.name == "hold":
-                item_name, hand_name = prop.value  # type: ignore
+                hold_val = prop.value
+                item_name = hold_val[0]
+                hand_name = hold_val[1]
+                item_scale = float(hold_val[2]) if len(hold_val) > 2 else 1.0
                 if hand_name == "left":
                     init_left_prop = item_name
+                    init_left_prop_scale = item_scale
                 else:
                     init_right_prop = item_name
+                    init_right_prop_scale = item_scale
 
         idle_cfg = IdleConfig()
         if av_node.idle:
@@ -117,9 +124,12 @@ class AvatarCompiler:
                         ExpressionEvent(timestamp=tb.timestamp, expression=act.expression)
                     )
                 elif isinstance(act, AvatarPropertyNode) and act.name == "hold":
-                    item_name, hand_name = act.value  # type: ignore
+                    hold_val = act.value
+                    item_name = hold_val[0]
+                    hand_name = hold_val[1]
+                    item_scale = float(hold_val[2]) if len(hold_val) > 2 else 1.0
                     hold_events.append(
-                        HoldEvent(timestamp=tb.timestamp, item=item_name, hand=hand_name)
+                        HoldEvent(timestamp=tb.timestamp, item=item_name, hand=hand_name, scale=item_scale)
                     )
                 elif isinstance(act, AnimationNode):
                     ev = self._lower_animation(act, tb.timestamp)
@@ -134,6 +144,8 @@ class AvatarCompiler:
             initial_rotation=init_rot,
             initial_left_prop=init_left_prop,
             initial_right_prop=init_right_prop,
+            initial_left_prop_scale=init_left_prop_scale,
+            initial_right_prop_scale=init_right_prop_scale,
             idle=idle_cfg,
             expressions=expr_events,
             hold_events=hold_events,

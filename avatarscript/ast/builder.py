@@ -128,26 +128,32 @@ class ASTBuilder(Transformer):
             loc=_loc_from_meta(meta), name="rotation", value=float(str(children[0]))
         )
 
-    def hold_stmt(self, meta: Any, children: List[Any]) -> HoldNode:
+    def hold_stmt(self, meta: Any, children: List[Any]) -> AvatarPropertyNode:
         item = "microphone"
         hand = "right"
+        scale = 1.0
         for kind, val in children:
             if kind == "item":
                 item = val
             elif kind == "hand":
                 hand = val
+            elif kind == "scale":
+                scale = float(val)
             elif kind == "val":
                 if val in ("left", "right"):
                     hand = val
                 else:
                     item = val
-        return AvatarPropertyNode(loc=_loc_from_meta(meta), name="hold", value=(item, hand))
+        return AvatarPropertyNode(loc=_loc_from_meta(meta), name="hold", value=(item, hand, scale))
 
     def hold_item(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
         return ("item", _strip_quotes(str(children[0])))
 
     def hold_hand(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
         return ("hand", _strip_quotes(str(children[0])).lower())
+
+    def hold_scale(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("scale", float(str(children[0])))
 
     def hold_val(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
         return ("val", _strip_quotes(str(children[0])).lower())
