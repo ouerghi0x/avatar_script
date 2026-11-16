@@ -8,6 +8,7 @@ from avatarscript.ast.nodes import (
     AvatarPropertyNode,
     ExpressionNode,
     AnimationNode,
+    TalkNode,
 )
 from avatarscript.compiler.validator import SemanticValidator, AvatarValidationException
 from avatarscript.runtime.scene import Scene
@@ -17,6 +18,7 @@ from avatarscript.runtime.animation import (
     AnimationEvent,
     ExpressionEvent,
     HoldEvent,
+    TalkEvent,
     IdleConfig,
 )
 
@@ -116,6 +118,7 @@ class AvatarCompiler:
         expr_events = []
         anim_events = []
         hold_events = []
+        talk_events = []
 
         for tb in sorted(av_node.timeline_blocks, key=lambda b: b.timestamp):
             for act in tb.actions:
@@ -130,6 +133,28 @@ class AvatarCompiler:
                     item_scale = float(hold_val[2]) if len(hold_val) > 2 else 1.0
                     hold_events.append(
                         HoldEvent(timestamp=tb.timestamp, item=item_name, hand=hand_name, scale=item_scale)
+                    )
+                elif isinstance(act, TalkNode):
+                    # If audio specified and duration omitted, get audio duration via ffprobe/lipsync
+                    dur = act.duration if act.duration is not None else 1.0
+                    if act.audio and act.duration is None:
+                        audio_p = Path(act.audio)
+                        if not audio_p.is_absolute() and not audio_p.exists():
+                            cand = Path.cwd() / act.audio
+                            if cand.exists():
+                                audio_p = cand
+                        from avatarscript.runtime.lipsync import AudioSpeechAnalyzer
+                        env = AudioSpeechAnalyzer.load_audio_envelope(audio_p)
+                        if len(env.time_points) > 0:
+                            dur = float(env.time_points[-1])
+                    talk_events.append(
+                        TalkEvent(
+                            timestamp=tb.timestamp,
+                            audio=act.audio,
+                            duration=dur,
+                            threshold=act.threshold,
+                            speed=act.speed,
+                        )
                     )
                 elif isinstance(act, AnimationNode):
                     ev = self._lower_animation(act, tb.timestamp)
@@ -149,6 +174,7 @@ class AvatarCompiler:
             idle=idle_cfg,
             expressions=expr_events,
             hold_events=hold_events,
+            talk_events=talk_events,
             animations=anim_events,
         )
 

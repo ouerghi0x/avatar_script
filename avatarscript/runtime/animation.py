@@ -2,9 +2,11 @@
 import math
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
+from pathlib import Path
 from avatarscript.runtime.avatar import AvatarState, build_default_layers
 from avatarscript.renderer.aura_renderer import AuraState
 from avatarscript.runtime.interpolation import apply_easing, lerp
+from avatarscript.runtime.lipsync import AudioSpeechAnalyzer
 
 
 @dataclass
@@ -45,6 +47,15 @@ class HoldEvent:
     item: str
     hand: str = "right"  # 'left' or 'right'
     scale: float = 1.0
+
+
+@dataclass
+class TalkEvent:
+    timestamp: float
+    audio: Optional[str] = None
+    duration: float = 1.0
+    threshold: float = 0.12
+    speed: float = 1.0
 
 
 @dataclass
@@ -116,6 +127,7 @@ class AvatarTimeline:
     idle: IdleConfig = field(default_factory=IdleConfig)
     expressions: List[ExpressionEvent] = field(default_factory=list)
     hold_events: List[HoldEvent] = field(default_factory=list)
+    talk_events: List[TalkEvent] = field(default_factory=list)
     animations: List[AnimationEvent] = field(default_factory=list)
 
     def evaluate_at(self, t: float) -> AvatarState:
@@ -243,6 +255,34 @@ class AvatarTimeline:
             left_prop_scale=left_prop_scale,
             right_prop_scale=right_prop_scale,
         )
+
+        # Resolve active speech/talking viseme at timestamp t
+        speaking_mouth: Optional[str] = None
+        for tev in self.talk_events:
+            if tev.timestamp <= t <= tev.timestamp + tev.duration and tev.duration > 1e-9:
+                t_offset = t - tev.timestamp
+                if tev.audio:
+                    audio_p = Path(tev.audio)
+                    if not audio_p.is_absolute() and not audio_p.exists():
+                        # Check workspace root
+                        cand = Path.cwd() / tev.audio
+                        if cand.exists():
+                            audio_p = cand
+                    speaking_mouth = AudioSpeechAnalyzer.get_mouth_at(
+                        audio_p, t_offset, threshold=tev.threshold, base_expression=expr
+                    )
+                else:
+                    # Procedural chatter animation
+                    chatter_cycle = math.sin(t_offset * 16.0 * tev.speed)
+                    speaking_mouth = "mouth_happy.svg" if chatter_cycle > 0 else f"mouth_{expr}.svg"
+                break
+
+        # Swap mouth layer if currently articulating speech
+        if speaking_mouth:
+            for l in layers:
+                if l.name == "mouth":
+                    l.asset_filename = speaking_mouth
+                    break
 
         # 5. Resolve Aura State
         aura_active = False

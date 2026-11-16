@@ -12,6 +12,7 @@ from avatarscript.ast.nodes import (
     ExpressionNode,
     AnimationNode,
     HoldNode,
+    TalkNode,
 )
 
 
@@ -181,9 +182,37 @@ class ASTBuilder(Transformer):
     def timeline_block(self, meta: Any, children: List[Any]) -> TimelineBlockNode:
         ts = _parse_time(str(children[0]))
         actions = [
-            c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode, AvatarPropertyNode))
+            c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode))
         ]
         return TimelineBlockNode(loc=_loc_from_meta(meta), timestamp=ts, actions=actions)
+
+    def talk_stmt(self, meta: Any, children: List[Any]) -> TalkNode:
+        audio = None
+        duration = None
+        threshold = 0.12
+        speed = 1.0
+        for kind, val in children:
+            if kind == "audio":
+                audio = val
+            elif kind == "duration":
+                duration = val
+            elif kind == "threshold":
+                threshold = val
+            elif kind == "speed":
+                speed = val
+        return TalkNode(loc=_loc_from_meta(meta), audio=audio, duration=duration, threshold=threshold, speed=speed)
+
+    def talk_audio(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
+        return ("audio", _strip_quotes(str(children[0])))
+
+    def talk_duration(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("duration", _parse_time(str(children[0])))
+
+    def talk_threshold(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("threshold", float(str(children[0])))
+
+    def talk_speed(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("speed", float(str(children[0])))
 
     def expression_stmt(self, meta: Any, children: List[Any]) -> ExpressionNode:
         return ExpressionNode(loc=_loc_from_meta(meta), expression=str(children[0]))

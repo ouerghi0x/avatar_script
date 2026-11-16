@@ -8,6 +8,7 @@ from avatarscript.ast.nodes import (
     AvatarPropertyNode,
     ExpressionNode,
     AnimationNode,
+    TalkNode,
     SourceLocation,
 )
 from avatarscript.runtime.expressions import VALID_EXPRESSIONS
@@ -245,6 +246,22 @@ class SemanticValidator:
                                     act.loc,
                                 )
                             )
+                elif isinstance(act, TalkNode):
+                    if act.audio:
+                        audio_path = Path(act.audio)
+                        if not audio_path.is_absolute():
+                            audio_path = self.assets_root.parent / audio_path
+                        if not audio_path.exists():
+                            # Check under workspace root as fallback
+                            ws_audio = Path.cwd() / act.audio
+                            if not ws_audio.exists():
+                                errors.append(
+                                    ValidationError(f"Audio file '{act.audio}' not found", act.loc)
+                                )
+                    elif act.duration is None or act.duration <= 0:
+                        errors.append(
+                            ValidationError("Talk action requires either an audio file or positive duration", act.loc)
+                        )
                 elif isinstance(act, AnimationNode):
                     self._validate_animation(act, errors)
 

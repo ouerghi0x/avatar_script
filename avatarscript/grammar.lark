@@ -60,6 +60,16 @@ timeline_block: "at" TIME ":" _NL _INDENT action_stmt+ _DEDENT
             | animate_stmt
             | direct_transform_stmt
             | hold_stmt
+            | talk_stmt
+
+talk_stmt: "talk" talk_param+ _NL
+
+?talk_param: "audio" ":" (STRING | NAME)       -> talk_audio
+           | "duration" TIME                   -> talk_duration
+           | "threshold" ":" SIGNED_NUMBER     -> talk_threshold
+           | "speed" ":" SIGNED_NUMBER         -> talk_speed
+           | "audio" (STRING | NAME)           -> talk_audio
+           | (STRING | NAME)                   -> talk_audio
 
 expression_stmt: "expression" NAME _NL
 animate_stmt: "animate" NAME anim_param* _NL

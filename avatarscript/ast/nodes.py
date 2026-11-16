@@ -41,7 +41,15 @@ class AvatarPropertyNode(ASTNode):
     value: Union[str, float, Tuple[float, float], Tuple[str, str], Tuple[str, str, float]]
 
 
-ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode]
+@dataclass
+class TalkNode(ASTNode):
+    audio: Optional[str] = None
+    duration: Optional[float] = None
+    threshold: float = 0.12
+    speed: float = 1.0
+
+
+ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode]
 
 
 @dataclass
