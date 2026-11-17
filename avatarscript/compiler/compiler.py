@@ -9,6 +9,8 @@ from avatarscript.ast.nodes import (
     ExpressionNode,
     AnimationNode,
     TalkNode,
+    HeadTurnNode,
+    LookNode,
 )
 from avatarscript.compiler.validator import SemanticValidator, AvatarValidationException
 from avatarscript.runtime.scene import Scene
@@ -19,6 +21,8 @@ from avatarscript.runtime.animation import (
     ExpressionEvent,
     HoldEvent,
     TalkEvent,
+    HeadTurnEvent,
+    LookEvent,
     IdleConfig,
 )
 
@@ -119,6 +123,8 @@ class AvatarCompiler:
         anim_events = []
         hold_events = []
         talk_events = []
+        head_turn_events = []
+        look_events = []
 
         for tb in sorted(av_node.timeline_blocks, key=lambda b: b.timestamp):
             for act in tb.actions:
@@ -156,6 +162,29 @@ class AvatarCompiler:
                             speed=act.speed,
                         )
                     )
+                elif isinstance(act, HeadTurnNode):
+                    dur = act.duration if act.duration is not None else 0.3
+                    head_turn_events.append(
+                        HeadTurnEvent(
+                            start_time=tb.timestamp,
+                            duration=dur,
+                            yaw=act.yaw,
+                            pitch=act.pitch,
+                            easing=act.easing,
+                        )
+                    )
+                elif isinstance(act, LookNode):
+                    dur = act.duration if act.duration is not None else 0.2
+                    look_events.append(
+                        LookEvent(
+                            start_time=tb.timestamp,
+                            duration=dur,
+                            target=act.target,
+                            look_x=act.look_x,
+                            look_y=act.look_y,
+                            easing=act.easing,
+                        )
+                    )
                 elif isinstance(act, AnimationNode):
                     ev = self._lower_animation(act, tb.timestamp)
                     anim_events.append(ev)
@@ -175,6 +204,8 @@ class AvatarCompiler:
             expressions=expr_events,
             hold_events=hold_events,
             talk_events=talk_events,
+            head_turn_events=head_turn_events,
+            look_events=look_events,
             animations=anim_events,
         )
 

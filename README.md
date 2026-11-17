@@ -317,6 +317,8 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 
 | Animation   | Syntax Examples                                                            | Effect                                                                     |
 | :---------- | :------------------------------------------------------------------------- | :------------------------------------------------------------------------- |
+| `head_turn` | `head_turn yaw:30 pitch:-10 duration 0.4s easing ease_out`                 | 2.5D VTuber depth parallax: differential layer shift and eye compression.  |
+| `look`      | `look at:left duration 0.2s` / `look x:8 y:-4 duration 0.2s`               | Eye pupil gaze targeting (`left`, `right`, `up`, `down`, `center`) or (x, y). |
 | `shake`     | `animate shake duration 0.4s` / `shake intensity:18 duration 0.4s`         | Damped horizontal oscillation that returns cleanly to `0` at completion.   |
 | `bounce`    | `animate bounce duration 0.6s easing ease_out` / `bounce intensity:15`    | Vertical jump arc with smooth squash-and-stretch.                          |
 | `nod`       | `animate nod duration 0.4s intensity 12` / `nod duration 0.35s`            | Transient head nod / torso pitch downward returning to resting angle.      |
@@ -373,6 +375,20 @@ Animate the character's mouth articulating dialogue in real-time synchronized to
   at 0.5s:
       talk audio:"production/voices/voice_part1.mp3" duration 7.0s
       nod duration 0.4s intensity:10
+  ```
+
+### 2.5D VTuber Head Turn & Eye Tracking (`head_turn` / `look`)
+Breathe pseudo-3D life and depth into characters using mathematical differential parallax:
+
+- **Differential Parallax Layer Shift**: When rotating head yaw/pitch, foreground facial features (eyes, mouth) shift horizontally and vertically at a higher rate than the skull base and hair.
+- **Perspective Compression**: Eyes and mouth subtly compress horizontally (`scale_x`) to simulate rotational curvature on a sphere.
+- **Gaze Tracking (`look`)**: Direct the avatar's pupils to look towards presets (`left`, `right`, `up`, `down`, `center`) or custom offsets `(x, y)` independently of head rotation.
+- **Syntax**:
+  ```ava
+  at 1.0s:
+      head_turn yaw:30 pitch:-10 duration 0.4s easing ease_out
+      look at:left duration 0.2s
+      expression smirk
   ```
 
 ---

@@ -61,6 +61,27 @@ timeline_block: "at" TIME ":" _NL _INDENT action_stmt+ _DEDENT
             | direct_transform_stmt
             | hold_stmt
             | talk_stmt
+            | head_turn_stmt
+            | look_stmt
+
+head_turn_stmt: "head_turn" head_turn_param+ _NL
+
+?head_turn_param: "yaw" ":" SIGNED_NUMBER      -> param_yaw
+                | "pitch" ":" SIGNED_NUMBER    -> param_pitch
+                | "yaw" SIGNED_NUMBER          -> param_yaw
+                | "pitch" SIGNED_NUMBER        -> param_pitch
+                | "duration" TIME              -> param_duration
+                | "easing" NAME                -> param_easing
+
+look_stmt: "look" look_param+ _NL
+
+?look_param: "at" ":" (NAME | STRING)          -> param_look_at
+           | "x" ":" SIGNED_NUMBER             -> param_look_x
+           | "y" ":" SIGNED_NUMBER             -> param_look_y
+           | "at" (NAME | STRING)              -> param_look_at
+           | "duration" TIME                   -> param_duration
+           | "easing" NAME                     -> param_easing
+           | (NAME | STRING)                   -> param_look_at
 
 talk_stmt: "talk" talk_param+ _NL
 

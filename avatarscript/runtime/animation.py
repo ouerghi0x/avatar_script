@@ -59,6 +59,25 @@ class TalkEvent:
 
 
 @dataclass
+class HeadTurnEvent:
+    start_time: float
+    duration: float
+    yaw: float = 0.0
+    pitch: float = 0.0
+    easing: str = "ease_in_out"
+
+
+@dataclass
+class LookEvent:
+    start_time: float
+    duration: float
+    target: Optional[str] = None
+    look_x: Optional[float] = None
+    look_y: Optional[float] = None
+    easing: str = "ease_in_out"
+
+
+@dataclass
 class IdleConfig:
     breathe: bool = False
     blink_interval: Optional[float] = None  # seconds, e.g. 4.0
@@ -128,6 +147,8 @@ class AvatarTimeline:
     expressions: List[ExpressionEvent] = field(default_factory=list)
     hold_events: List[HoldEvent] = field(default_factory=list)
     talk_events: List[TalkEvent] = field(default_factory=list)
+    head_turn_events: List[HeadTurnEvent] = field(default_factory=list)
+    look_events: List[LookEvent] = field(default_factory=list)
     animations: List[AnimationEvent] = field(default_factory=list)
 
     def evaluate_at(self, t: float) -> AvatarState:
@@ -150,6 +171,39 @@ class AvatarTimeline:
         opacity_events: List[Tuple[float, float, str, float, bool]] = []
         left_arm_events: List[Tuple[float, float, str, float, bool]] = []
         right_arm_events: List[Tuple[float, float, str, float, bool]] = []
+        yaw_events: List[Tuple[float, float, str, float, bool]] = []
+        pitch_events: List[Tuple[float, float, str, float, bool]] = []
+        look_x_events: List[Tuple[float, float, str, float, bool]] = []
+        look_y_events: List[Tuple[float, float, str, float, bool]] = []
+
+        # Head turn events -> yaw and pitch channels
+        for ht in self.head_turn_events:
+            yaw_events.append((ht.start_time, ht.duration, ht.easing, ht.yaw, False))
+            pitch_events.append((ht.start_time, ht.duration, ht.easing, ht.pitch, False))
+
+        # Look events -> look_x and look_y channels
+        # Target presets:
+        # 'center': (0, 0), 'left': (-10, 0), 'right': (10, 0), 'up': (0, -8), 'down': (0, 8)
+        target_map = {
+            "center": (0.0, 0.0),
+            "left": (-10.0, 0.0),
+            "right": (10.0, 0.0),
+            "up": (0.0, -8.0),
+            "down": (0.0, 8.0),
+        }
+        for lk in self.look_events:
+            lx = lk.look_x
+            ly = lk.look_y
+            if lk.target and lk.target in target_map:
+                preset_x, preset_y = target_map[lk.target]
+                if lx is None:
+                    lx = preset_x
+                if ly is None:
+                    ly = preset_y
+            if lx is not None:
+                look_x_events.append((lk.start_time, lk.duration, lk.easing, lx, False))
+            if ly is not None:
+                look_y_events.append((lk.start_time, lk.duration, lk.easing, ly, False))
 
         for anim in self.animations:
             if anim.kind == "move":
@@ -194,6 +248,10 @@ class AvatarTimeline:
         opacity = _evaluate_channel(t, self.initial_opacity, opacity_events)
         left_arm_rot = _evaluate_channel(t, 0.0, left_arm_events)
         right_arm_rot = _evaluate_channel(t, 0.0, right_arm_events)
+        yaw = _evaluate_channel(t, 0.0, yaw_events)
+        pitch = _evaluate_channel(t, 0.0, pitch_events)
+        look_x = _evaluate_channel(t, 0.0, look_x_events)
+        look_y = _evaluate_channel(t, 0.0, look_y_events)
 
         # 3. Resolve additive transient procedural effects (shake, bounce, nod) active at t
         offset_x = 0.0
@@ -254,6 +312,10 @@ class AvatarTimeline:
             right_prop=right_prop,
             left_prop_scale=left_prop_scale,
             right_prop_scale=right_prop_scale,
+            yaw=yaw,
+            pitch=pitch,
+            look_x=look_x,
+            look_y=look_y,
         )
 
         # Resolve active speech/talking viseme at timestamp t

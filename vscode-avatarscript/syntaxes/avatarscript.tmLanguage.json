@@ -136,14 +136,14 @@
     "animation-statements": {
       "patterns": [
         {
-          "match": "^\\s*(animate)\\s+(shake|bounce|nod|move|rotate|fade|scale|arm|left_arm|right_arm|aura)\\b",
+          "match": "^\\s*(animate)\\s+(shake|bounce|nod|move|rotate|fade|scale|arm|left_arm|right_arm|aura|head_turn|look)\\b",
           "captures": {
             "1": { "name": "keyword.control.animate.avatarscript" },
             "2": { "name": "support.function.animation.avatarscript" }
           }
         },
         {
-          "match": "^\\s*(move|rotate|fade|scale|nod|shake|bounce|arm|left_arm|right_arm|aura)\\b",
+          "match": "^\\s*(move|rotate|fade|scale|nod|shake|bounce|arm|left_arm|right_arm|aura|head_turn|look|talk)\\b",
           "captures": {
             "1": { "name": "support.function.animation.avatarscript" }
           }
@@ -174,10 +174,21 @@
           }
         },
         {
-          "match": "\\b(x|y|to_x|to_y|to|deg)(:)([-+]?[0-9]+(?:\\.[0-9]+)?)\\b",
+          "match": "\\b(x|y|to_x|to_y|to|deg|yaw|pitch)(:)([-+]?[0-9]+(?:\\.[0-9]+)?)\\b",
           "captures": {
             "1": { "name": "variable.parameter.coordinate.avatarscript" },
             "2": { "name": "punctuation.separator.key-value.avatarscript" },
+            "3": { "name": "constant.numeric.avatarscript" }
+          }
+        },
+        {
+          "match": "\\b(at)(:)(left|right|up|down|center)\\b",
+          "captures": {
+            "1": { "name": "variable.parameter.avatarscript" },
+            "2": { "name": "punctuation.separator.key-value.avatarscript" },
+            "3": { "name": "constant.language.avatarscript" }
+          }
+        },
             "3": { "name": "constant.numeric.avatarscript" }
           }
         }

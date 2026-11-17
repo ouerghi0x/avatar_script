@@ -58,14 +58,46 @@ def build_default_layers(
     right_prop: str = "none",
     left_prop_scale: float = 1.0,
     right_prop_scale: float = 1.0,
+    yaw: float = 0.0,
+    pitch: float = 0.0,
+    look_x: float = 0.0,
+    look_y: float = 0.0,
 ) -> List[LayerState]:
-    """Construct the ordered layer rig for a character at a specific state."""
+    """Construct the ordered layer rig for a character at a specific state with 2.5D depth parallax."""
     expr_assets = resolve_expression_assets(expression, is_blinking=is_blinking)
+
+    # 2.5D Parallax & Perspective depth factors:
+    # yaw is horizontal rotation in degrees (-45 to +45 typical)
+    # pitch is vertical rotation in degrees (-30 to +30 typical)
+    # Normalized factors:
+    ny = yaw / 45.0
+    np = pitch / 30.0
+
+    # Layer differential offsets:
+    # Background (ears/head base) shifts slightly with head
+    # Foreground features (eyes, mouth) shift significantly more
+    head_dx = ny * 6.0
+    head_dy = np * 4.0
+
+    eyes_dx = ny * 24.0 + look_x
+    eyes_dy = np * 14.0 + look_y
+    # Perspective compression as head turns sideways
+    eyes_scale_x = max(0.2, 1.0 - 0.20 * abs(ny))
+
+    mouth_dx = ny * 18.0
+    mouth_dy = np * 12.0
+    mouth_scale_x = max(0.2, 1.0 - 0.16 * abs(ny))
+
+    # Subtle counter-parallax for torso/arms
+    body_dx = -ny * 2.0
+    body_dy = np * 1.5
+
     layers = [
         LayerState(
             name="left_arm",
             asset_filename="left_arm.svg",
             z_order=10,
+            x=-ny * 4.0,
             y=breathe_offset_y * 0.6,
             rotation=left_arm_rot,
             rotation_center=(95.0, 265.0),  # Pivot around shoulder socket
@@ -74,14 +106,42 @@ def build_default_layers(
             name="right_arm",
             asset_filename="right_arm.svg",
             z_order=15,
+            x=-ny * 4.0,
             y=breathe_offset_y * 0.6,
             rotation=right_arm_rot,
             rotation_center=(305.0, 265.0),  # Pivot around shoulder socket
         ),
-        LayerState(name="body", asset_filename="body.svg", z_order=20, y=breathe_offset_y * 0.4, scale_y=breathe_scale_y),
-        LayerState(name="head", asset_filename="head.svg", z_order=30, y=breathe_offset_y),
-        LayerState(name="eyes", asset_filename=expr_assets.eyes_asset, z_order=40, y=breathe_offset_y),
-        LayerState(name="mouth", asset_filename=expr_assets.mouth_asset, z_order=50, y=breathe_offset_y),
+        LayerState(
+            name="body",
+            asset_filename="body.svg",
+            z_order=20,
+            x=body_dx,
+            y=breathe_offset_y * 0.4 + body_dy,
+            scale_y=breathe_scale_y,
+        ),
+        LayerState(
+            name="head",
+            asset_filename="head.svg",
+            z_order=30,
+            x=head_dx,
+            y=breathe_offset_y + head_dy,
+        ),
+        LayerState(
+            name="eyes",
+            asset_filename=expr_assets.eyes_asset,
+            z_order=40,
+            x=eyes_dx,
+            y=breathe_offset_y + eyes_dy,
+            scale_x=eyes_scale_x,
+        ),
+        LayerState(
+            name="mouth",
+            asset_filename=expr_assets.mouth_asset,
+            z_order=50,
+            x=mouth_dx,
+            y=breathe_offset_y + mouth_dy,
+            scale_x=mouth_scale_x,
+        ),
     ]
 
     # Attach left hand prop if equipped
@@ -91,7 +151,7 @@ def build_default_layers(
                 name="prop_left",
                 asset_filename=f"{left_prop}.svg",
                 z_order=12,
-                x=0.0,
+                x=-ny * 4.0,
                 y=breathe_offset_y * 0.6,
                 scale_x=left_prop_scale,
                 scale_y=left_prop_scale,
@@ -108,7 +168,7 @@ def build_default_layers(
                 name="prop_right",
                 asset_filename=f"{right_prop}.svg",
                 z_order=60,  # Render on top of right arm/hand
-                x=0.0,
+                x=-ny * 4.0,
                 y=breathe_offset_y * 0.6,
                 scale_x=right_prop_scale,
                 scale_y=right_prop_scale,

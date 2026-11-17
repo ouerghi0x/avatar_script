@@ -15,6 +15,7 @@ This folder contains official demonstration `.ava` scripts and code showcasing t
 | **[`super_saiyan_aura.ava`](super_saiyan_aura.ava)** | 1920x1080 @ 30 FPS | `ninja` | Dragon Ball Z-style Ki energy charging, Super Saiyan gold transformation, rising flame noise, and electric sparks. |
 | **[`prop_rigging_showcase.ava`](prop_rigging_showcase.ava)** | 1920x1080 @ 30 FPS | `default`, `ninja` | Vector prop rigging: holding and swapping microphones, controllers, glowing swords, and phones with custom scaling (`scale:1.4`). |
 | **[`lipsync_narration_showcase.ava`](lipsync_narration_showcase.ava)** | 1920x1080 @ 30 FPS | `default` | Audio-driven viseme lip-sync: articulates mouth syllables in exact synchronization with real voiceover audio (`voice_part1.mp3`). |
+| **[`depth_25d_showcase.ava`](depth_25d_showcase.ava)** | 1280x720 @ 30 FPS | `default` | 2.5D VTuber depth parallax: differential layer shifts (`head_turn yaw/pitch`), perspective eye/mouth compression, and pupil tracking (`look at:left/right`). |
 | **[`duo_commentary_debate.ava`](duo_commentary_debate.ava)** | 1920x1080 @ 30 FPS | `ninja`, `demon` | Heated conversational debate scene between co-hosts. |
 | **[`gaming_rage_popoff.ava`](gaming_rage_popoff.ava)** | 1920x1080 @ 30 FPS | `default` | Sudden gamer rage pop-off with screen shake, elastic zooms, and explosive expressions. |
 

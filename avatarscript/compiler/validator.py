@@ -9,6 +9,8 @@ from avatarscript.ast.nodes import (
     ExpressionNode,
     AnimationNode,
     TalkNode,
+    HeadTurnNode,
+    LookNode,
     SourceLocation,
 )
 from avatarscript.runtime.expressions import VALID_EXPRESSIONS
@@ -261,6 +263,32 @@ class SemanticValidator:
                     elif act.duration is None or act.duration <= 0:
                         errors.append(
                             ValidationError("Talk action requires either an audio file or positive duration", act.loc)
+                        )
+                elif isinstance(act, HeadTurnNode):
+                    if act.duration is None or act.duration <= 0:
+                        errors.append(
+                            ValidationError("Head turn requires a positive duration (e.g. 'duration 0.3s')", act.loc)
+                        )
+                    if act.easing not in EASING_FUNCTIONS:
+                        errors.append(
+                            ValidationError(f"Unknown easing '{act.easing}' for head_turn", act.loc)
+                        )
+                elif isinstance(act, LookNode):
+                    if act.duration is None or act.duration <= 0:
+                        errors.append(
+                            ValidationError("Look action requires a positive duration (e.g. 'duration 0.2s')", act.loc)
+                        )
+                    if act.easing not in EASING_FUNCTIONS:
+                        errors.append(
+                            ValidationError(f"Unknown easing '{act.easing}' for look", act.loc)
+                        )
+                    valid_look_targets = {"left", "right", "up", "down", "center"}
+                    if act.target is not None and act.target not in valid_look_targets:
+                        errors.append(
+                            ValidationError(
+                                f"Invalid look target '{act.target}' (allowed: {sorted(valid_look_targets)})",
+                                act.loc,
+                            )
                         )
                 elif isinstance(act, AnimationNode):
                     self._validate_animation(act, errors)

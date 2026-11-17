@@ -13,6 +13,8 @@ from avatarscript.ast.nodes import (
     AnimationNode,
     HoldNode,
     TalkNode,
+    HeadTurnNode,
+    LookNode,
 )
 
 
@@ -182,9 +184,66 @@ class ASTBuilder(Transformer):
     def timeline_block(self, meta: Any, children: List[Any]) -> TimelineBlockNode:
         ts = _parse_time(str(children[0]))
         actions = [
-            c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode))
+            c for c in children[1:] if isinstance(c, (ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode, HeadTurnNode, LookNode))
         ]
         return TimelineBlockNode(loc=_loc_from_meta(meta), timestamp=ts, actions=actions)
+
+    def head_turn_stmt(self, meta: Any, children: List[Any]) -> HeadTurnNode:
+        yaw = 0.0
+        pitch = 0.0
+        duration = 0.3
+        easing = "ease_in_out"
+        for kind, val in children:
+            if kind == "yaw":
+                yaw = val
+            elif kind == "pitch":
+                pitch = val
+            elif kind == "duration":
+                duration = val
+            elif kind == "easing":
+                easing = val
+        return HeadTurnNode(loc=_loc_from_meta(meta), yaw=yaw, pitch=pitch, duration=duration, easing=easing)
+
+    def param_yaw(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("yaw", float(str(children[0])))
+
+    def param_pitch(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("pitch", float(str(children[0])))
+
+    def look_stmt(self, meta: Any, children: List[Any]) -> LookNode:
+        target = None
+        look_x = None
+        look_y = None
+        duration = 0.2
+        easing = "ease_in_out"
+        for kind, val in children:
+            if kind == "look_at":
+                target = val
+            elif kind == "look_x":
+                look_x = val
+            elif kind == "look_y":
+                look_y = val
+            elif kind == "duration":
+                duration = val
+            elif kind == "easing":
+                easing = val
+        return LookNode(
+            loc=_loc_from_meta(meta),
+            target=target,
+            look_x=look_x,
+            look_y=look_y,
+            duration=duration,
+            easing=easing,
+        )
+
+    def param_look_at(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
+        return ("look_at", _strip_quotes(str(children[0])).lower())
+
+    def param_look_x(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("look_x", float(str(children[0])))
+
+    def param_look_y(self, meta: Any, children: List[Any]) -> Tuple[str, float]:
+        return ("look_y", float(str(children[0])))
 
     def talk_stmt(self, meta: Any, children: List[Any]) -> TalkNode:
         audio = None

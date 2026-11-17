@@ -49,7 +49,24 @@ class TalkNode(ASTNode):
     speed: float = 1.0
 
 
-ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode]
+@dataclass
+class HeadTurnNode(ASTNode):
+    yaw: float = 0.0      # -45 to +45 deg (horizontal angle)
+    pitch: float = 0.0    # -30 to +30 deg (vertical tilt)
+    duration: float = 0.4
+    easing: str = "ease_out"
+
+
+@dataclass
+class LookNode(ASTNode):
+    target: Optional[str] = None  # 'left', 'right', 'center', 'up', 'down'
+    look_x: Optional[float] = None
+    look_y: Optional[float] = None
+    duration: float = 0.2
+    easing: str = "ease_out"
+
+
+ActionNode = Union[ExpressionNode, AnimationNode, AvatarPropertyNode, TalkNode, HeadTurnNode, LookNode]
 
 
 @dataclass
