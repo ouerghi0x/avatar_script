@@ -20,12 +20,14 @@ Instead of manually keyframing every blink, mouth swap, bounce, or zoom in Premi
    - [4.5 Timeline Blocks (`at <time>s:`)](#45-timeline-blocks-at-times)
    - [4.6 Facial Expressions](#46-facial-expressions)
    - [4.7 Animations & Transform Channels](#47-animations--transform-channels)
-   - [4.8 Easing Functions](#48-easing-functions)
-   - [4.9 Simultaneous & Overlapping Animations](#49-simultaneous--overlapping-animations)
+   - [4.8 2.5D VTuber Depth System (`head_turn` & `look`)](#48-25d-vtuber-depth-system-head_turn--look)
+   - [4.9 Easing Functions](#49-easing-functions)
+   - [4.10 Simultaneous & Overlapping Animations](#410-simultaneous--overlapping-animations)
 5. [Real-World Production Recipes](#5-real-world-production-recipes)
    - [Recipe 1: YouTube 16:9 Commentary Overlay](#recipe-1-youtube-169-commentary-overlay)
    - [Recipe 2: Vertical 9:16 Manhwa Shorts Narrator (60 FPS)](#recipe-2-vertical-916-manhwa-shorts-narrator-60-fps)
    - [Recipe 3: Multi-Avatar Co-Host Reaction Scene](#recipe-3-multi-avatar-co-host-reaction-scene)
+   - [Recipe 4: Cinematic Flight & Dynamic Scale Control](#recipe-4-cinematic-flight--dynamic-scale-control)
 6. [Creating Custom SVG Characters](#6-creating-custom-svg-characters)
 7. [Compiler Diagnostics & Troubleshooting](#7-compiler-diagnostics--troubleshooting)
 8. [Formal Grammar Summary](#8-formal-grammar-summary)
@@ -428,10 +430,111 @@ aura none duration 0.3s
 - `sparks`: `1` (or `true`) to enable electric lightning arcs; `0` (or `false`) to disable.
 - `duration`: Transition duration to interpolate intensity, size, and speed from current values.
 
+#### 9. `hold` (Interactive Prop Rigging & Hand Sockets)
+Equips and rigs vector props (microphones, swords, controllers, phones) to the character's left or right anatomical hand sockets (`(82, 330)` for left hand, `(318, 330)` for right hand). Props automatically track shoulder and arm rotations in real time:
+
+- **Built-in Props**: `microphone`, `sword`, `controller`, `phone` (or release with `none` / `off`).
+- **Scale Parameter (`scale:<multiplier>`)**: Custom scale multiplier (e.g. `scale:1.4`) to make items prominent and bold.
+- **Initial Setup**: Can be declared directly inside the `avatar` definition:
+  ```ava
+  avatar "player":
+      character "default"
+      hold item:"microphone" hand:right scale:1.3
+  ```
+- **Timeline Swapping**: Can be dynamically attached, swapped, or sheathed at any timestamp:
+  ```ava
+  at 2.0s:
+      hold item:"sword" hand:left scale:1.5
+      hold item:"none" hand:right
+  ```
+
+#### 10. `talk` (Audio-Driven Viseme Lip-Sync)
+Articulates speech mouths in real time synchronized either to an audio file (`.mp3`, `.wav`) or a procedural rhythm:
+
+```ava
+# 1. Real voiceover audio synchronization:
+at 0.5s:
+    talk audio:"production/voices/voice_part1.mp3" duration 6.5s threshold:0.12
+
+# 2. Procedural rhythmic banter/chatter:
+at 7.0s:
+    talk duration 2.0s speed:1.2
+```
+- `audio:"<path>"`: Relative or absolute path to audio file. The engine analyzes 40ms RMS energy windows to swap between open visemes (`mouth_happy`, `mouth_surprised`) and closed resting mouth.
+- `threshold:<num>`: RMS noise floor sensitivity (default `0.12`).
+- `speed:<num>`: Frequency multiplier for procedural chatter.
 
 ---
 
-### 4.8 Easing Functions
+### 4.8 2.5D VTuber Depth System (`head_turn` & `look`)
+
+AvatarScript includes a complete **2.5D pseudo-3D parallax and gaze tracking engine**. It transforms flat 2D layered SVG avatars into expressive Live2D/VTuber-style characters with volumetric depth without requiring complex 3D meshes or external rigging software.
+
+#### The Three Core Depth Principles:
+1. **Differential Parallax Layer Shift**:
+   When the head rotates, foreground layers shift faster than background layers across the focal axis:
+   $$\Delta x_{\text{eyes}} > \Delta x_{\text{mouth}} > \Delta x_{\text{head}} > \Delta x_{\text{body}}$$
+   - Head Base shifts subtly: $ny \cdot 6.0\text{px}$
+   - Mouth shifts moderately: $ny \cdot 18.0\text{px}$
+   - Eyes shift significantly: $ny \cdot 24.0\text{px}$
+2. **Perspective Curvature Compression**:
+   As the head turns sideways, the face wraps around a cylindrical skull volume. The eyes and mouth compress horizontally:
+   $$\text{scale\_x} = 1.0 - 0.20 \cdot |ny|$$
+3. **Independent Eye Pupil Gaze Tracking (`look`)**:
+   Pupils can track left/right/up/down independently of head direction, enabling natural conversational eye contact and wandering gazes.
+
+#### Syntax & Case Reference:
+
+##### Case A: Basic Head Turn (`yaw` & `pitch`)
+Turn the head horizontally (`yaw`) and vertically (`pitch`) with custom duration and easing:
+```ava
+at 1.0s:
+    # Look slightly right (+28 deg) and down (+10 deg)
+    head_turn yaw:28 pitch:10 duration 0.4s easing ease_out
+```
+
+##### Case B: Eye Gaze Direction Tracking (`look at:<direction>`)
+Quickly dart the eyes towards standard focal points (`left`, `right`, `up`, `down`, `center`):
+```ava
+at 1.2s:
+    look at:left duration 0.2s easing ease_out
+
+at 2.0s:
+    look at:right duration 0.2s easing ease_out
+
+at 3.0s:
+    look at:center duration 0.15s
+```
+
+##### Case C: Precise Pixel Look Coordinates (`look x:<dx> y:<dy>`)
+For nuanced pupil targeting:
+```ava
+at 2.5s:
+    look x:8.0 y:-4.0 duration 0.2s
+```
+
+##### Case D: Coordinated VTuber Conversation (Turn + Gaze + Viseme)
+Combine head rotation, eye darting, expression changes, and speech articulation simultaneously:
+```ava
+at 0.5s:
+    head_turn yaw:-30 pitch:5 duration 0.5s easing ease_out
+    look at:left duration 0.25s
+    expression surprised
+    talk audio:"production/voices/voice_part1.mp3" duration 4.0s
+```
+
+##### Case E: Reset to Center Camera
+Smoothly return the avatar's head and eyes to default camera position:
+```ava
+at 4.5s:
+    head_turn yaw:0 pitch:0 duration 0.4s easing ease_in_out
+    look at:center duration 0.25s
+    expression happy
+```
+
+---
+
+### 4.9 Easing Functions
 
 Every animation accepts an optional `easing <name>` parameter (defaults to `linear` if omitted):
 
@@ -445,7 +548,7 @@ Every animation accepts an optional `easing <name>` parameter (defaults to `line
 
 ---
 
-### 4.9 Simultaneous & Overlapping Animations
+### 4.10 Simultaneous & Overlapping Animations
 
 AvatarScript's runtime engine evaluates each property channel independently:
 1. **Different Properties Run Simultaneously**: You can combine `move`, `scale`, `rotate`, `fade`, `shake`, and `bounce` at the exact same timestamp (`at 3s:`) and they will blend seamlessly.
@@ -543,6 +646,75 @@ scene "duo_reaction":
             animate shake duration 0.4s intensity 18
 
     render "duo_reaction.mp4"
+```
+
+---
+
+### Recipe 4: Cinematic Flight & Dynamic Scale Control
+Take full advantage of multi-channel coordination (`move`, `scale`, `rotate`, `aura`, and `head_turn`) to have an avatar take off, fly dynamically across the 1080p canvas, dive closer into camera (huge scale zoom), and swoop back out into the distance:
+
+```ava
+scene "Flying_Hero_Showcase":
+    canvas 1920x1080
+    background "#0d0f18"
+    fps 30
+    duration 7.0s
+    render "renders/flying_showcase.mp4"
+
+    avatar "hero":
+        character "ninja"
+        position x:960 y:850
+        scale 0.95
+        hold item:"sword" hand:right scale:1.4
+
+        idle:
+            breathe
+            blink every 3.0s
+
+        at 0.0s:
+            expression neutral
+
+        # 1. Takeoff: ignite energy aura, lift off, tilt forward into flight
+        at 1.0s:
+            expression angry
+            aura cyan size:45 intensity:1.5 speed:1.8 sparks:1 duration 0.4s
+            move to_x:960 to_y:450 duration 0.7s easing ease_out
+            rotate -12 duration 0.5s easing ease_out
+            scale 1.15 duration 0.7s easing ease_out
+            head_turn yaw:15 pitch:-12 duration 0.4s
+            look at:up duration 0.2s
+
+        # 2. High-speed swoop toward camera: massive scale zoom (flying right at viewer)
+        at 2.2s:
+            expression shocked
+            aura gold size:70 intensity:2.2 speed:2.5 sparks:1 duration 0.3s
+            move to_x:1350 to_y:280 duration 0.8s easing ease_in_out
+            scale 1.85 duration 0.8s easing ease_in_out
+            rotate 15 duration 0.6s easing ease_in_out
+            head_turn yaw:-25 pitch:10 duration 0.5s
+            look at:left duration 0.2s
+            right_arm -65 duration 0.3s
+
+        # 3. Bank and fly across into the distance (shrink down to scale 0.55)
+        at 3.5s:
+            expression smirk
+            aura blue size:30 intensity:1.0 speed:1.2 sparks:0 duration 0.5s
+            move to_x:380 to_y:220 duration 1.2s easing ease_in_out
+            scale 0.55 duration 1.2s easing ease_in_out
+            rotate -20 duration 0.8s easing ease_in_out
+            head_turn yaw:35 pitch:-15 duration 0.6s
+            look at:right duration 0.3s
+            right_arm 0 duration 0.4s
+
+        # 4. Swoop back to center screen and hover steadily at standard scale
+        at 5.2s:
+            expression happy
+            aura gold size:40 intensity:1.2 speed:1.0 sparks:1 duration 0.5s
+            move to_x:960 to_y:540 duration 0.9s easing ease_out
+            scale 1.20 duration 0.9s easing ease_out
+            rotate 0 duration 0.6s easing ease_out
+            head_turn yaw:0 pitch:0 duration 0.5s easing ease_in_out
+            look at:center duration 0.3s
 ```
 
 ---
