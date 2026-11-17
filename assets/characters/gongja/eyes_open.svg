@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500">
+  <!-- Sharp Determined Eyebrows -->
+  <polygon points="134,120 178,124 174,130 136,125" fill="#181926"/>
+  <polygon points="266,120 222,124 226,130 264,125" fill="#181926"/>
+  
+  <!-- Left Eye: SSS-Class Amber/Crimson Soul Core -->
+  <polygon points="140,146 156,136 174,142 172,154 154,160 142,154" fill="#FFFFFF" stroke="#111827" stroke-width="4"/>
+  <ellipse cx="157" cy="148" rx="10" ry="12" fill="#E64553"/>
+  <circle cx="157" cy="148" r="6" fill="#8839EF"/>
+  <circle cx="154" cy="144" r="3.5" fill="#FFFFFF"/>
+  <circle cx="160" cy="152" r="1.5" fill="#DCE0E8"/>
+
+  <!-- Right Eye: SSS-Class Amber/Crimson Soul Core -->
+  <polygon points="260,146 244,136 226,142 228,154 246,160 258,154" fill="#FFFFFF" stroke="#111827" stroke-width="4"/>
+  <ellipse cx="243" cy="148" rx="10" ry="12" fill="#E64553"/>
+  <circle cx="243" cy="148" r="6" fill="#8839EF"/>
+  <circle cx="240" cy="144" r="3.5" fill="#FFFFFF"/>
+  <circle cx="246" cy="152" r="1.5" fill="#DCE0E8"/>
+</svg>

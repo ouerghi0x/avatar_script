@@ -188,9 +188,6 @@
             "2": { "name": "punctuation.separator.key-value.avatarscript" },
             "3": { "name": "constant.language.avatarscript" }
           }
-        },
-            "3": { "name": "constant.numeric.avatarscript" }
-          }
         }
       ]
     },

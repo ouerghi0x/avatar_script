@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500">
+  <!-- Left Sleeve (Coat Arm) -->
+  <polygon points="108,255 60,275 42,390 88,405" fill="#181822" stroke="#111827" stroke-width="8"/>
+  <!-- Dark Coat Cuff -->
+  <polygon points="56,365 42,390 88,405 95,380" fill="#2E3440" stroke="#111827" stroke-width="4"/>
+  <!-- Pale Bandaged Hand / Grip -->
+  <circle cx="64" cy="402" r="21" fill="#E5E9F0" stroke="#111827" stroke-width="5"/>
+  <!-- Finger Details -->
+  <line x1="56" y1="395" x2="68" y2="415" stroke="#4C566A" stroke-width="3"/>
+</svg>
