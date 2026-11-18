@@ -1,4 +1,4 @@
-"""Frame renderer and pure-Python SVG rasterizer for AvatarScript."""
+"""Frame renderer and pure-Python SVG/PNG layer rasterizer for AvatarScript."""
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -26,26 +26,80 @@ def parse_color(color_str: Optional[str]) -> Optional[Tuple[int, int, int, int]]
 
 
 class SVGRasterizer:
-    """Lightweight pure-Python SVG rasterizer using 2x supersampled Pillow ImageDraw."""
+    """Layer loader supporting 2x supersampled SVG vectors and RGBA PNG sprites."""
+
+    RIG_SIZE: Tuple[int, int] = (400, 500)
+    SUPPORTED_EXTENSIONS: Tuple[str, ...] = (".png", ".svg")
 
     def __init__(self, assets_root: Path):
         self.assets_root = assets_root
         self._cache: Dict[str, Image.Image] = {}
+
+    def _find_by_stem(self, base_dir: Path, stem: str) -> Optional[Path]:
+        """Find a matching asset file by stem across supported extensions."""
+        for ext in self.SUPPORTED_EXTENSIONS:
+            candidate = base_dir / f"{stem}{ext}"
+            if candidate.exists():
+                return candidate
+        return None
+
+    def _resolve_asset_path(self, character: str, filename: str, is_prop: bool = False) -> Path:
+        """Resolve a character layer or prop path (.svg or .png), with expression fallbacks."""
+        base_dir = self.assets_root / "props" if is_prop else self.assets_root / "characters" / character
+        requested = base_dir / filename
+        if requested.exists():
+            return requested
+
+        stem = Path(filename).stem
+        sibling = self._find_by_stem(base_dir, stem)
+        if sibling is not None:
+            return sibling
+
+        if not is_prop:
+            if stem.startswith("eyes_") and stem != "eyes_open":
+                fallback = self._find_by_stem(base_dir, "eyes_open")
+                if fallback is not None:
+                    return fallback
+            elif stem.startswith("mouth_") and stem != "mouth_neutral":
+                fallback = self._find_by_stem(base_dir, "mouth_neutral")
+                if fallback is not None:
+                    return fallback
+
+        raise FileNotFoundError(f"Missing layer asset (.svg/.png): {requested}")
+
+    @staticmethod
+    def load_png(png_path: Path, target_size: Optional[Tuple[int, int]] = None) -> Image.Image:
+        """Load a PNG as RGBA, optionally fitting it aspect-safely inside target_size."""
+        with Image.open(png_path) as src:
+            img = src.convert("RGBA")
+
+        if target_size is None or img.size == target_size:
+            return img
+
+        tw, th = target_size
+        scale = min(tw / img.width, th / img.height)
+        nw = max(1, int(round(img.width * scale)))
+        nh = max(1, int(round(img.height * scale)))
+        resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+
+        canvas = Image.new("RGBA", target_size, (0, 0, 0, 0))
+        ox = (tw - nw) // 2
+        oy = (th - nh) // 2
+        canvas.paste(resized, (ox, oy), resized)
+        return canvas
 
     def load_layer_image(self, character: str, filename: str, is_prop: bool = False) -> Image.Image:
         cache_key = f"prop/{filename}" if is_prop else f"{character}/{filename}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        if is_prop:
-            svg_path = self.assets_root / "props" / filename
+        asset_path = self._resolve_asset_path(character, filename, is_prop=is_prop)
+        if asset_path.suffix.lower() == ".png":
+            target_size = None if is_prop else self.RIG_SIZE
+            img = self.load_png(asset_path, target_size=target_size)
         else:
-            svg_path = self.assets_root / "characters" / character / filename
+            img = self.rasterize_svg(asset_path)
 
-        if not svg_path.exists():
-            raise FileNotFoundError(f"Missing SVG asset: {svg_path}")
-
-        img = self.rasterize_svg(svg_path)
         self._cache[cache_key] = img
         return img
 
@@ -120,7 +174,7 @@ class SVGRasterizer:
 class FrameRenderer:
     """Composites SceneState into a Pillow RGBA frame with quantized rig caching."""
 
-    def __init__(self, assets_root: Optional[Path] = None, max_rig_cache_size: int = 256):
+    def __init__(self, assets_root: Optional[Path] = None, max_rig_cache_size: int = 1024):
         if assets_root is None:
             assets_root = Path(__file__).resolve().parent.parent.parent / "assets"
         self.rasterizer = SVGRasterizer(assets_root)
@@ -136,22 +190,22 @@ class FrameRenderer:
             (
                 l.name,
                 l.asset_filename,
-                round(l.x, 2),
-                round(l.y, 2),
-                round(l.scale_x, 4),
-                round(l.scale_y, 4),
-                round(l.rotation, 2),
+                round(l.x * 2) / 2,
+                round(l.y * 2) / 2,
+                round(l.scale_x, 3),
+                round(l.scale_y, 3),
+                round(l.rotation, 1),
                 l.visible,
-                round(l.opacity, 3),
+                round(l.opacity, 2),
                 l.z_order,
             )
             for l in sorted(avatar.layers, key=lambda item: item.z_order)
         )
         return (
             avatar.character,
-            round(avatar.scale, 4),
-            round(avatar.rotation, 2),
-            round(avatar.opacity, 3),
+            round(avatar.scale, 3),
+            round(avatar.rotation, 1),
+            round(avatar.opacity, 2),
             layer_tuples,
         )
 
@@ -163,7 +217,7 @@ class FrameRenderer:
             return self._rig_cache[cache_key]
 
         self.rig_cache_misses += 1
-        rig_w, rig_h = 400, 500
+        rig_w, rig_h = self.rasterizer.RIG_SIZE
         rig_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
 
         for layer in sorted(avatar.layers, key=lambda l: l.z_order):
@@ -184,7 +238,7 @@ class FrameRenderer:
                 prop_scale = base_target_dim / max_dim if max_dim > 0 else 1.0
                 pw = max(1, int(round(base_prop.width * prop_scale)))
                 ph = max(1, int(round(base_prop.height * prop_scale)))
-                scaled_prop = base_prop.resize((pw, ph), Image.Resampling.BICUBIC)
+                scaled_prop = base_prop.resize((pw, ph), Image.Resampling.LANCZOS)
 
                 # Anchor prop onto rig canvas at hand socket
                 prop_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))

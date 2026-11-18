@@ -144,12 +144,16 @@ def build_default_layers(
         ),
     ]
 
+    def _prop_asset_filename(name: str) -> str:
+        lower = name.lower()
+        return name if lower.endswith((".svg", ".png")) else f"{name}.svg"
+
     # Attach left hand prop if equipped
     if left_prop and left_prop.lower() not in ("none", "off"):
         layers.append(
             LayerState(
                 name="prop_left",
-                asset_filename=f"{left_prop}.svg",
+                asset_filename=_prop_asset_filename(left_prop),
                 z_order=12,
                 x=-ny * 4.0,
                 y=breathe_offset_y * 0.6,
@@ -166,7 +170,7 @@ def build_default_layers(
         layers.append(
             LayerState(
                 name="prop_right",
-                asset_filename=f"{right_prop}.svg",
+                asset_filename=_prop_asset_filename(right_prop),
                 z_order=60,  # Render on top of right arm/hand
                 x=-ny * 4.0,
                 y=breathe_offset_y * 0.6,

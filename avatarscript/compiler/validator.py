@@ -108,6 +108,47 @@ class SemanticValidator:
 
         return errors
 
+    def _prop_asset_exists(self, item_name: str) -> bool:
+        """Check whether a prop exists as .svg or .png under assets/props."""
+        props_dir = self.assets_root / "props"
+        p = Path(item_name)
+        if p.suffix.lower() in (".svg", ".png") and (props_dir / item_name).exists():
+            return True
+        stem = p.stem if p.suffix.lower() in (".svg", ".png") else item_name
+        return (props_dir / f"{stem}.svg").exists() or (props_dir / f"{stem}.png").exists()
+
+    def _validate_hold_prop(
+        self,
+        hold_val: tuple,
+        loc: SourceLocation,
+        errors: List[ValidationError],
+    ) -> None:
+        """Validate a hold item declaration or timeline action."""
+        item_name = hold_val[0]
+        hand_name = hold_val[1]
+        item_scale = hold_val[2] if len(hold_val) > 2 else 1.0
+        if hand_name not in ("left", "right"):
+            errors.append(
+                ValidationError(
+                    f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
+                    loc,
+                )
+            )
+        if item_scale <= 0:
+            errors.append(
+                ValidationError(
+                    f"Prop scale must be positive (got {item_scale})",
+                    loc,
+                )
+            )
+        if item_name not in ("none", "off") and not self._prop_asset_exists(item_name):
+            errors.append(
+                ValidationError(
+                    f"Prop '{item_name}' not found in {self.assets_root / 'props'} (.svg or .png, e.g. microphone, sword, controller, phone)",
+                    loc,
+                )
+            )
+
     def _validate_avatar(
         self,
         avatar: AvatarNode,
@@ -154,33 +195,7 @@ class SemanticValidator:
                         )
                     )
             elif prop.name == "hold":
-                hold_val = prop.value
-                item_name = hold_val[0]
-                hand_name = hold_val[1]
-                item_scale = hold_val[2] if len(hold_val) > 2 else 1.0
-                if hand_name not in ("left", "right"):
-                    errors.append(
-                        ValidationError(
-                            f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
-                            prop.loc,
-                        )
-                    )
-                if item_scale <= 0:
-                    errors.append(
-                        ValidationError(
-                            f"Prop scale must be positive (got {item_scale})",
-                            prop.loc,
-                        )
-                    )
-                if item_name not in ("none", "off"):
-                    prop_svg = self.assets_root / "props" / f"{item_name}.svg"
-                    if not prop_svg.exists():
-                        errors.append(
-                            ValidationError(
-                                f"Prop '{item_name}' not found in {self.assets_root / 'props'} (e.g. microphone, sword, controller, phone)",
-                                prop.loc,
-                            )
-                        )
+                self._validate_hold_prop(prop.value, prop.loc, errors)  # type: ignore
 
         if not has_character:
             errors.append(
@@ -221,33 +236,7 @@ class SemanticValidator:
                             )
                         )
                 elif isinstance(act, AvatarPropertyNode) and act.name == "hold":
-                    hold_val = act.value
-                    item_name = hold_val[0]
-                    hand_name = hold_val[1]
-                    item_scale = hold_val[2] if len(hold_val) > 2 else 1.0
-                    if hand_name not in ("left", "right"):
-                        errors.append(
-                            ValidationError(
-                                f"Invalid hand '{hand_name}' for hold (allowed: 'left', 'right')",
-                                act.loc,
-                            )
-                        )
-                    if item_scale <= 0:
-                        errors.append(
-                            ValidationError(
-                                f"Prop scale must be positive (got {item_scale})",
-                                act.loc,
-                            )
-                        )
-                    if item_name not in ("none", "off"):
-                        prop_svg = self.assets_root / "props" / f"{item_name}.svg"
-                        if not prop_svg.exists():
-                            errors.append(
-                                ValidationError(
-                                    f"Prop '{item_name}' not found in {self.assets_root / 'props'} (e.g. microphone, sword, controller, phone)",
-                                    act.loc,
-                                )
-                            )
+                    self._validate_hold_prop(act.value, act.loc, errors)  # type: ignore
                 elif isinstance(act, TalkNode):
                     if act.audio:
                         audio_path = Path(act.audio)

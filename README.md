@@ -88,6 +88,57 @@ scene "Super Saiyan Power Up":
 
 ---
 
+## Showcase Demo 2: Native RGBA PNG Character Rig (`kenney_host`)
+
+AvatarScript now natively supports **32-bit RGBA `.png` character layers and `.png` props** alongside vector `.svg` rigs. Below is the `kenney_host` demo built from CC0 Kenney Modular Character PNGs combining lip-sync speech, arm gestures + prop holding, 2.5D head parallax turns, and procedural energy aura:
+
+<p align="center">
+  <img src="assets/branding/kenney_png_demo.gif" alt="Kenney Host PNG Rig Demo" width="640" />
+</p>
+
+<details>
+<summary><b>View the complete <code>examples/kenney_png_demo.ava</code> script</b></summary>
+
+```ava
+scene "Kenney PNG Demo":
+    canvas 1280x720
+    background "#1E293B"
+    fps 30
+    duration 4.0s
+    render "kenney_png_demo.mp4"
+
+    avatar "Host":
+        character "kenney_host"
+        position center
+        scale 1.15
+        hold item:"microphone" hand:right scale:0.9
+
+        idle:
+            breathe
+            blink every 2.0s
+
+        at 0.0s:
+            expression neutral
+            talk duration 0.9s
+
+        at 1.0s:
+            expression happy
+            right_arm -45 duration 0.2s
+            animate aura on intensity:0.9 color:blue
+
+        at 2.0s:
+            expression shocked
+            head_turn yaw:25 duration 0.25s
+
+        at 3.0s:
+            expression angry
+            head_turn yaw:0 duration 0.25s
+            animate aura off duration 0.1s
+```
+</details>
+
+---
+
 **AvatarScript** is a lightweight, deterministic Domain-Specific Language (DSL) and animation engine written in Python for describing, previewing, and rendering 2D animated reaction avatars for YouTube videos, anime reactions, manhwa narrations, and commentary shorts.
 
 Instead of keyframing every facial change, blink, breathing cycle, or bounce manually in a video editor, creators write declarative `.ava` scripts and compile them directly into H.264 `.mp4` videos or 32-bit RGBA transparent `.png` frame sequences.
@@ -100,8 +151,8 @@ Instead of keyframing every facial change, blink, breathing cycle, or bounce man
 - **Deterministic Time-Based Animation Runtime**: `evaluate_at(t)` is a pure function of timestamp $t \in [0, \text{duration}]$. Seeking to `t = 5.0s` directly or rendering sequentially at 30/60 FPS yields bit-identical pixel output.
 - **Snapshot-on-Start Overlapping Channel Resolution**: Independent channels (`x`, `y`, `scale`, `rotation`, `opacity`, `left_arm`, `right_arm`, `aura`, `prop`) animate simultaneously without conflict, while transient effects (`shake`, `bounce`, `nod`) and idle cycles (`breathe`, `blink`) layer additively.
 - **Audio-Driven Viseme Lip-Sync**: Pass any `.mp3` or `.wav` voiceover track directly to `talk audio:"..."` to automatically articulate realistic mouth visemes synchronized to speech volume and syllable cadence.
-- **Interactive Vector Prop Rigging**: Equip avatars with microphones, swords, controllers, or phones (`hold item:"microphone" hand:right scale:1.4`) that dynamically anchor to hands and rotate naturally with arm gestures.
-- **2× Supersampled Pure-Python Vector SVG Rig**: Renders modular multi-layer characters (`body`, `head`, `left_arm`, `right_arm`, `eyes`, `mouth`, `props`) with anti-aliased downsampling and quantized rig caching—no external C/Cairo DLL dependencies required.
+- **Interactive Vector & PNG Prop Rigging**: Equip avatars with `.svg` or `.png` props such as microphones, swords, controllers, or phones (`hold item:"microphone" hand:right scale:1.4`) that dynamically anchor to hands and rotate naturally with arm gestures.
+- **Hybrid 2× Supersampled SVG & RGBA PNG Rig**: Renders modular multi-layer characters (`body`, `head`, `left_arm`, `right_arm`, `eyes`, `mouth`, `props`) from either pure-Python `.svg` vectors or transparent RGBA `.png` sprites (including mixed `.svg` + `.png` rigs) with aspect-ratio-safe `400×500` containment, automatic expression fallbacks, and quantized rig caching—no external C/Cairo DLL dependencies required.
 - **Procedural Non-Destructive Aura System**: Dragon Ball Z-style energy flames, multi-harmonic plasma noise, white-hot core, and electric lightning arcs rendered directly from the character silhouette without modifying original sprite pixels.
 - **Real-Time Pygame Preview & FFmpeg Export**: Interactive preview window with play/pause/scrub controls, plus direct H.264 (`yuv420p`) MP4 export and transparent RGBA PNG sequence export for NLE overlay workflows.
 - **Interactive VS Code Extension**: Full syntax highlighting, auto-completion snippets, and one-click commands to validate, preview, and render `.ava` scripts without using the terminal.
@@ -117,14 +168,17 @@ avatarscript/
 │       └── ci.yml                      # GitHub Actions automated test matrix
 ├── assets/
 │   ├── branding/                       # Official logos and showcase media
+│   │   ├── kenney_png_demo.gif
 │   │   ├── logo.png
 │   │   ├── logo.svg
 │   │   └── super_saiyan_aura.gif
 │   ├── characters/
-│   │   ├── default/                    # Standard blue hoodie narrator rig
-│   │   ├── ninja/                      # Shinobi with stealth hood and headband
-│   │   └── demon/                      # Horned crimson warrior with dark armor
-│   └── props/                          # Vector prop assets
+│   │   ├── default/                    # Standard blue hoodie SVG narrator rig
+│   │   ├── ninja/                      # Shinobi SVG rig with stealth hood and headband
+│   │   ├── demon/                      # Horned crimson warrior SVG rig
+│   │   ├── gongja/                     # Manhwa hunter protagonist SVG rig
+│   │   └── kenney_host/                # CC0 Modular RGBA PNG character rig
+│   └── props/                          # Vector (.svg) & raster (.png) prop assets
 │       ├── microphone.svg
 │       ├── sword.svg
 │       ├── controller.svg
@@ -144,12 +198,12 @@ avatarscript/
 │   │   ├── avatar.py                   # AvatarState, LayerState, named positions
 │   │   ├── animation.py                # AvatarTimeline & deterministic evaluate_at(t)
 │   │   ├── lipsync.py                  # RMS audio speech envelope & viseme mapper
-│   │   ├── expressions.py              # Facial expression -> SVG asset mapping
+│   │   ├── expressions.py              # Facial expression -> layer asset mapping
 │   │   ├── interpolation.py            # linear, ease_in, ease_out, ease_in_out, lerp
 │   │   └── timeline.py                 # Frame timestamp generator
 │   ├── renderer/
 │   │   ├── aura_renderer.py            # Procedural energy aura & lightning generator
-│   │   ├── frame_renderer.py           # SVGRasterizer & cached FrameRenderer
+│   │   ├── frame_renderer.py           # SVG/PNG rasterizer & cached FrameRenderer
 │   │   ├── preview.py                  # Real-time Pygame preview window
 │   │   └── video_exporter.py           # FFmpeg MP4 pipe & RGBA PNG sequence exporter
 │   └── cli.py                          # Command-line interface (`avatarscript`)
@@ -160,6 +214,8 @@ avatarscript/
 │   ├── basic_reaction.ava              # Minimal 6s starter reaction script
 │   ├── duo_commentary_debate.ava       # Multi-avatar podcast debate scene
 │   ├── gaming_rage_popoff.ava          # Dynamic gamer reaction with elastic bounce
+│   ├── kenney_png_demo.ava             # Native RGBA PNG character rig showcase
+│   ├── kenney_png_demo.mp4             # Rendered 1280x720 MP4 output for PNG demo
 │   ├── lipsync_narration_showcase.ava  # Audio-driven viseme speech synchronization
 │   ├── manhwa_commentary_shorts.ava    # Vertical 10s 1080x1920 @ 60 FPS Shorts script
 │   ├── prop_rigging_showcase.ava       # Microphone, sword, controller, phone rigging
@@ -167,7 +223,7 @@ avatarscript/
 │   ├── phase1_demo.py                  # Programmatic runtime/renderer API demo
 │   ├── renders/                        # Compiled H.264 MP4 videos
 │   └── snapshots/                      # Verification frame captures
-├── tests/                              # Pytest test suite (21 automated unit tests)
+├── tests/                              # Automated pytest suite (including PNG layer tests)
 ├── vscode-avatarscript/                # Official VS Code extension
 ├── LANGUAGE_GUIDE.md                   # Complete in-depth language manual
 ├── LICENSE                             # MIT License
@@ -287,29 +343,30 @@ scene "anime_reaction":
 
 ### Avatar Properties
 
-| Property    | Syntax Example                             | Description                                                                         |
-| :---------- | :----------------------------------------- | :---------------------------------------------------------------------------------- |
-| `character` | `character "default"`                      | Required folder name under `assets/characters/<name>/`.                             |
-| `position`  | `position right` or `position x:500 y:600` | Initial anchor position (`left`, `center`, `right`, or explicit pixel coordinates). |
-| `scale`     | `scale 1.2`                                | Initial uniform scale multiplier (`> 0`).                                           |
-| `rotation`  | `rotation -5`                              | Initial rotation angle in degrees (clockwise positive).                             |
+| Property    | Syntax Example                             | Description                                                                             |
+| :---------- | :----------------------------------------- | :-------------------------------------------------------------------------------------- |
+| `character` | `character "kenney_host"`                  | Required folder name under `assets/characters/<name>/` (`.svg`, `.png`, or mixed).     |
+| `position`  | `position right` or `position x:500 y:600` | Initial anchor position (`left`, `center`, `right`, or explicit pixel coordinates).     |
+| `scale`     | `scale 1.2`                                | Initial uniform scale multiplier (`> 0`).                                               |
+| `rotation`  | `rotation -5`                              | Initial rotation angle in degrees (clockwise positive).                                 |
+| `hold`      | `hold item:"microphone" hand:right scale:0.9` | Initial left/right hand prop (`.svg` or `.png` under `assets/props/`).               |
 
 ### Idle Behaviors (`idle:`)
 
 - `breathe`: Continuous chest/head sinusoidal breathing oscillation.
-- `blink every 4s`: Periodic 150ms eye-blink swap to `eyes_closed.svg` every $N$ seconds (must be `> 0.15s`).
+- `blink` / `blink every 4s`: Periodic 150ms eye-blink swap to `eyes_closed.svg` / `eyes_closed.png` every $N$ seconds (defaults to `4.0s`; must be `> 0.15s`).
 
 ### Facial Expressions (`expression <name>`)
 
-Supported built-in expressions (instantaneously swaps the `eyes` and `mouth` rig layers at the block timestamp):
+Supported built-in expressions swap the `eyes` and `mouth` rig layers (resolving `.png` or `.svg` automatically; omitted optional variants gracefully fall back to `eyes_open` / `mouth_neutral`):
 
-- `neutral` (`eyes_open.svg` + `mouth_neutral.svg`)
-- `happy` (`eyes_open.svg` + `mouth_happy.svg`)
-- `sad` (`eyes_open.svg` + `mouth_sad.svg`)
-- `angry` (`eyes_angry.svg` + `mouth_angry.svg`)
-- `surprised` (`eyes_open.svg` + `mouth_surprised.svg`)
-- `shocked` (`eyes_shocked.svg` + `mouth_shocked.svg`)
-- `smirk` (`eyes_open.svg` + `mouth_smirk.svg`)
+- `neutral` (`eyes_open` + `mouth_neutral`)
+- `happy` (`eyes_open` + `mouth_happy`)
+- `sad` (`eyes_open` + `mouth_sad`)
+- `angry` (`eyes_angry` + `mouth_angry`)
+- `surprised` (`eyes_open` + `mouth_surprised`)
+- `shocked` (`eyes_shocked` + `mouth_shocked`)
+- `smirk` (`eyes_open` + `mouth_smirk`)
 
 ### Animations & Easing Functions
 
@@ -322,10 +379,10 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 | `shake`     | `animate shake duration 0.4s` / `shake intensity:18 duration 0.4s`         | Damped horizontal oscillation that returns cleanly to `0` at completion.   |
 | `bounce`    | `animate bounce duration 0.6s easing ease_out` / `bounce intensity:15`    | Vertical jump arc with smooth squash-and-stretch.                          |
 | `nod`       | `animate nod duration 0.4s intensity 12` / `nod duration 0.35s`            | Transient head nod / torso pitch downward returning to resting angle.      |
-| `left_arm`  | `left_arm 45 duration 0.3s easing ease_out`                                | Rotates left arm around anatomical shoulder socket `(95, 265)`.            |
-| `right_arm` | `right_arm -80 duration 0.35s easing ease_out`                             | Rotates right arm around anatomical shoulder socket `(305, 265)`.          |
-| `aura`      | `aura gold size:60 intensity:2.0 sparks:1 duration 0.3s`                   | Dynamic procedural Ki energy aura with rising flames and lightning arcs.   |
-| `talk`      | `talk audio:"voice.mp3" duration 5.0s` / `talk duration 2.0s speed:1.2`    | Audio-driven viseme speech lip-sync or procedural chatter articulation.    |
+| `arm`       | `arm 35 duration 0.3s` / `left_arm 45 duration 0.3s` / `right_arm -45 duration 0.2s` | Rotates both arms or individual arms around anatomical shoulder sockets (`(95, 265)` / `(305, 265)`). |
+| `hold`      | `hold item:"shield.png" hand:left scale:1.2` / `hold item:"none" hand:right` | Equips, swaps, or releases `.svg`/`.png` props dynamically on the timeline. |
+| `aura`      | `animate aura on intensity:0.9 color:blue` / `aura gold size:60 intensity:2.0 sparks:1 duration 0.3s` / `animate aura off duration 0.1s` | Enables, configures, or disables procedural Ki energy flames and lightning arcs. |
+| `talk`      | `talk audio:"voice.mp3" duration 5.0s threshold:0.05` / `talk duration 2.0s speed:1.2` | Audio-driven viseme speech lip-sync or procedural chatter articulation.    |
 | `move`      | `move x:30 y:-10 duration 0.3s` / `move to_x:960 to_y:540 duration 0.5s`   | Relative offset (`x:`, `y:`) or absolute canvas target (`to_x:`, `to_y:`). |
 | `scale`     | `scale 1.35 duration 0.4s easing elastic_out`                              | Smoothly interpolates avatar scale to target multiplier.                   |
 | `rotate`    | `rotate 15 duration 0.3s easing ease_out`                                  | Smoothly interpolates avatar rotation (degrees).                           |
@@ -341,19 +398,33 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 
 ---
 
-## 6. Built-in Characters & Interactive Props
+## 6. Built-in Characters, Custom PNG/SVG Rigs & Props
 
 ### Built-in Characters
-AvatarScript includes **3 built-in character models** ready for use:
+AvatarScript includes **5 built-in character models** ready for use:
 
-- **`default`**: Standard blue hoodie narrator.
-- **`ninja`**: Dark shinobi gi with crimson belt, stealth hood, and headband plate.
-- **`demon`**: Crimson skin, horns, rune mark, dark armor, and claws.
+- **`default`**: Standard blue hoodie SVG narrator.
+- **`ninja`**: Dark shinobi gi SVG rig with crimson belt, stealth hood, and headband plate.
+- **`demon`**: Crimson skin SVG rig with horns, rune mark, dark armor, and claws.
+- **`gongja`**: Manhwa hunter protagonist SVG rig with trench coat and utility strap.
+- **`kenney_host`**: Modular 32-bit RGBA PNG rig assembled from Kenney's CC0 Modular Characters pack (see [`examples/kenney_png_demo.ava`](examples/kenney_png_demo.ava)).
+
+### Supporting Custom PNG & Mixed SVG/PNG Characters
+You can build custom characters using transparent RGBA `.png` images, `.svg` vectors, or a mix of both by placing layers under `assets/characters/<name>/`:
+
+- **Required base layers**: `body.png` (or `.svg`), `head.png`, `left_arm.png`, `right_arm.png`, `eyes_open.png`, `mouth_neutral.png`
+- **Optional expression layers**: `eyes_closed`, `eyes_angry`, `eyes_shocked`, `mouth_happy`, `mouth_sad`, `mouth_angry`, `mouth_surprised`, `mouth_shocked`, `mouth_smirk` (any omitted expression automatically falls back to `eyes_open` or `mouth_neutral`)
+- **Resolution & Aspect-Ratio Safety**: Native rig alignment is `400×500` (left shoulder pivot `(95, 265)`, right shoulder pivot `(305, 265)`). High-resolution or square PNG sprites (such as `800×1000` or `512×512`) are automatically contained inside `400×500` with `Image.Resampling.LANCZOS`, preserving exact proportions with zero stretching.
+
+```powershell
+# Render the included PNG character demo
+& "avatarscript\.venv\Scripts\avatarscript.exe" render avatarscript\examples\kenney_png_demo.ava -o kenney_png_demo.mp4
+```
 
 ### Interactive Props & Item Rigging (`hold`)
-Characters can hold and swap vector props in their left or right hands. Props automatically attach to the anatomical hand socket and smoothly follow shoulder/arm rotations:
+Characters can hold and swap `.svg` or `.png` props in their left or right hands. Props attach to the anatomical hand sockets (`(82, 330)` left / `(318, 330)` right) and follow shoulder/arm rotations smoothly:
 
-- **Built-in Props**: `microphone`, `sword`, `controller`, `phone` (or release with `none`)
+- **Built-in Props**: `microphone`, `sword`, `controller`, `phone` (or drop any custom `<item>.png` / `<item>.svg` into `assets/props/`; release with `none` or `off`)
 - **Custom Scaling**: Props can be explicitly scaled via `scale:<multiplier>` (e.g. `scale:1.4`)
 - **Syntax**:
   ```ava
@@ -361,7 +432,7 @@ Characters can hold and swap vector props in their left or right hands. Props au
       hold item:"microphone" hand:right scale:1.3
 
       at 2.0s:
-          hold item:"sword" hand:left scale:1.5
+          hold item:"shield.png" hand:left scale:1.2
           hold item:"none" hand:right
   ```
 
