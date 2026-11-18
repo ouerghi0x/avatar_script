@@ -96,7 +96,7 @@ expression_stmt: "expression" NAME _NL
 animate_stmt: "animate" NAME anim_param* _NL
 direct_transform_stmt: TRANSFORM_KIND anim_param* _NL
 
-TRANSFORM_KIND.2: "move" | "scale" | "rotate" | "fade" | "nod" | "arm" | "left_arm" | "right_arm" | "aura" | "shake" | "bounce"
+TRANSFORM_KIND.2: "move" | "scale" | "rotate" | "fade" | "nod" | "arm" | "left_arm" | "right_arm" | "leg" | "left_leg" | "right_leg" | "walk" | "run" | "jump" | "aura" | "shake" | "bounce"
 
 ?anim_param: "duration" TIME          -> param_duration
            | "easing" NAME            -> param_easing

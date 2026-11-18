@@ -1,6 +1,6 @@
 """Compiler lowering AvatarScript AST into the runtime Intermediate Representation (IR)."""
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from avatarscript.parser import AvatarParser
 from avatarscript.ast.nodes import (
     SceneNode,
@@ -209,9 +209,32 @@ class AvatarCompiler:
             animations=anim_events,
         )
 
+    @staticmethod
+    def _extract_limb_control(act: AnimationNode, kind_prefix: str) -> Tuple[str, Optional[float]]:
+        """Extract limb target ('left', 'right') and angle for arm/leg animations."""
+        angle = act.scalar_target
+        if angle is None:
+            for key in ("deg", "angle"):
+                if key in act.params:
+                    angle = float(act.params[key])
+                    break
+        if angle is None:
+            angle = act.intensity
+
+        if act.kind == f"left_{kind_prefix}":
+            return "left", angle
+        if act.kind == f"right_{kind_prefix}":
+            return "right", angle
+        if "left" in act.params:
+            return "left", float(act.params["left"])
+        if "right" in act.params:
+            return "right", float(act.params["right"])
+        return "right", angle
+
     def _lower_animation(self, act: AnimationNode, start_time: float) -> AnimationEvent:
         dur = act.duration if act.duration is not None else 0.5
         intensity = act.intensity if act.intensity is not None else 15.0
+        anim_speed = float(act.params.get("speed", 1.0))
 
         target_x = None
         target_y = None
@@ -220,14 +243,31 @@ class AvatarCompiler:
         target_scale = None
         target_rot = None
         target_opacity = None
+        target_arm = None
+        arm_angle = None
+        target_leg = None
+        leg_angle = None
 
-        if act.kind == "move":
+        if act.kind in ("move", "walk", "run", "jump"):
             if "to_x" in act.params or "to_y" in act.params:
                 target_x = act.params.get("to_x")
                 target_y = act.params.get("to_y")
-            else:
+            elif act.kind == "move":
                 delta_x = act.params.get("x", 0.0)
                 delta_y = act.params.get("y", 0.0)
+            else:
+                delta_x = act.params.get("x")
+                delta_y = act.params.get("y")
+
+        if act.kind == "jump":
+            if "height" in act.params:
+                intensity = float(act.params["height"])
+            elif act.intensity is not None:
+                intensity = float(act.intensity)
+            elif act.scalar_target is not None:
+                intensity = float(act.scalar_target)
+            else:
+                intensity = 90.0
         elif act.kind == "scale":
             target_scale = (
                 act.scalar_target if act.scalar_target is not None else act.params.get("to", 1.0)
@@ -241,27 +281,11 @@ class AvatarCompiler:
                 act.scalar_target if act.scalar_target is not None else act.params.get("to", 1.0)
             )
         elif act.kind in ("arm", "left_arm", "right_arm"):
-            target_rot = (
-                act.scalar_target if act.scalar_target is not None else (
-                    act.params.get("deg") or act.params.get("angle") or act.intensity
-                )
-            )
-
-        target_arm = None
-        if act.kind == "left_arm":
-            target_arm = "left"
-        elif act.kind == "right_arm":
-            target_arm = "right"
-        elif act.kind == "arm":
-            # Check string param or convention
-            if "left" in act.params:
-                target_arm = "left"
-                target_rot = act.params["left"]
-            elif "right" in act.params:
-                target_arm = "right"
-                target_rot = act.params["right"]
-            else:
-                target_arm = "right"
+            target_arm, arm_angle = self._extract_limb_control(act, "arm")
+            target_rot = arm_angle
+        elif act.kind in ("leg", "left_leg", "right_leg"):
+            target_leg, leg_angle = self._extract_limb_control(act, "leg")
+            target_rot = leg_angle
 
         aura_active = None
         aura_color = None
@@ -313,7 +337,10 @@ class AvatarCompiler:
             target_opacity=target_opacity,
             intensity=intensity,
             target_arm=target_arm,
-            arm_angle=target_rot,
+            arm_angle=arm_angle,
+            target_leg=target_leg,
+            leg_angle=leg_angle,
+            anim_speed=anim_speed,
             aura_active=aura_active,
             aura_color=aura_color,
             aura_intensity=aura_intensity,

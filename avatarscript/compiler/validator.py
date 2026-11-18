@@ -21,13 +21,19 @@ VALID_ANIMATIONS = {
     "shake",
     "bounce",
     "move",
+    "scale",
     "rotate",
     "fade",
-    "scale",
     "nod",
     "arm",
     "left_arm",
     "right_arm",
+    "leg",
+    "left_leg",
+    "right_leg",
+    "walk",
+    "run",
+    "jump",
     "aura",
 }
 
@@ -323,6 +329,22 @@ class SemanticValidator:
                 errors.append(
                     ValidationError(
                         "Animation 'move' requires target coordinates (e.g. 'x:30 y:0')",
+                        anim.loc,
+                    )
+                )
+        elif anim.kind in ("walk", "run", "jump"):
+            unknown_keys = set(anim.params.keys()) - {"x", "y", "to_x", "to_y", "height", "speed"}
+            if unknown_keys:
+                errors.append(
+                    ValidationError(
+                        f"Invalid parameter(s) {sorted(unknown_keys)} for '{anim.kind}' animation",
+                        anim.loc,
+                    )
+                )
+            if "speed" in anim.params and float(anim.params["speed"]) <= 0:
+                errors.append(
+                    ValidationError(
+                        f"Animation '{anim.kind}' speed must be positive (got {anim.params['speed']})",
                         anim.loc,
                     )
                 )

@@ -11,7 +11,7 @@ from avatarscript.runtime.lipsync import AudioSpeechAnalyzer
 
 @dataclass
 class AnimationEvent:
-    kind: str  # 'move', 'scale', 'rotate', 'fade', 'shake', 'bounce', 'nod', 'arm', 'aura'
+    kind: str  # 'move', 'walk', 'run', 'jump', 'scale', 'rotate', 'fade', 'shake', 'bounce', 'nod', 'arm', 'leg', 'aura'
     start_time: float
     duration: float
     easing: str = "ease_in_out"
@@ -26,6 +26,10 @@ class AnimationEvent:
     # Arm control parameters
     target_arm: Optional[str] = None  # 'left', 'right', 'both'
     arm_angle: Optional[float] = None
+    # Leg control parameters
+    target_leg: Optional[str] = None  # 'left', 'right', 'both'
+    leg_angle: Optional[float] = None
+    anim_speed: float = 1.0
     # Aura parameters
     aura_active: Optional[bool] = None
     aura_color: Optional[str] = None
@@ -171,6 +175,8 @@ class AvatarTimeline:
         opacity_events: List[Tuple[float, float, str, float, bool]] = []
         left_arm_events: List[Tuple[float, float, str, float, bool]] = []
         right_arm_events: List[Tuple[float, float, str, float, bool]] = []
+        left_leg_events: List[Tuple[float, float, str, float, bool]] = []
+        right_leg_events: List[Tuple[float, float, str, float, bool]] = []
         yaw_events: List[Tuple[float, float, str, float, bool]] = []
         pitch_events: List[Tuple[float, float, str, float, bool]] = []
         look_x_events: List[Tuple[float, float, str, float, bool]] = []
@@ -206,7 +212,7 @@ class AvatarTimeline:
                 look_y_events.append((lk.start_time, lk.duration, lk.easing, ly, False))
 
         for anim in self.animations:
-            if anim.kind == "move":
+            if anim.kind in ("move", "walk", "run", "jump"):
                 if anim.delta_x is not None:
                     x_events.append((anim.start_time, anim.duration, anim.easing, anim.delta_x, True))
                 elif anim.target_x is not None:
@@ -240,6 +246,17 @@ class AvatarTimeline:
                     left_arm_events.append((anim.start_time, anim.duration, anim.easing, angle, False))
                 if target in ("right", "both"):
                     right_arm_events.append((anim.start_time, anim.duration, anim.easing, angle, False))
+            elif anim.kind in ("leg", "left_leg", "right_leg"):
+                angle = anim.leg_angle if anim.leg_angle is not None else (
+                    anim.target_rotation if anim.target_rotation is not None else (
+                        anim.intensity if anim.intensity is not None else 0.0
+                    )
+                )
+                target = anim.target_leg or ("left" if anim.kind == "left_leg" else "right")
+                if target in ("left", "both"):
+                    left_leg_events.append((anim.start_time, anim.duration, anim.easing, angle, False))
+                if target in ("right", "both"):
+                    right_leg_events.append((anim.start_time, anim.duration, anim.easing, angle, False))
 
         x = _evaluate_channel(t, self.initial_x, x_events)
         y = _evaluate_channel(t, self.initial_y, y_events)
@@ -248,12 +265,14 @@ class AvatarTimeline:
         opacity = _evaluate_channel(t, self.initial_opacity, opacity_events)
         left_arm_rot = _evaluate_channel(t, 0.0, left_arm_events)
         right_arm_rot = _evaluate_channel(t, 0.0, right_arm_events)
+        left_leg_rot = _evaluate_channel(t, 0.0, left_leg_events)
+        right_leg_rot = _evaluate_channel(t, 0.0, right_leg_events)
         yaw = _evaluate_channel(t, 0.0, yaw_events)
         pitch = _evaluate_channel(t, 0.0, pitch_events)
         look_x = _evaluate_channel(t, 0.0, look_x_events)
         look_y = _evaluate_channel(t, 0.0, look_y_events)
 
-        # 3. Resolve additive transient procedural effects (shake, bounce, nod) active at t
+        # 3. Resolve additive transient procedural effects (shake, bounce, nod, walk, run, jump) active at t
         offset_x = 0.0
         offset_y = 0.0
         offset_rot = 0.0
@@ -266,10 +285,39 @@ class AvatarTimeline:
                     offset_x += anim.intensity * envelope * math.sin(prog * math.pi * 8.0)
                 elif anim.kind == "bounce":
                     # Smooth vertical jump arc (zero at start and end)
-                    offset_y -= abs(math.sin(prog * math.pi * 2.0)) * (anim.intensity * 2.0)
+                    hop = abs(math.sin(prog * math.pi * 2.0))
+                    offset_y -= hop * (anim.intensity * 2.0)
+                    left_leg_rot += hop * 14.0
+                    right_leg_rot -= hop * 14.0
                 elif anim.kind == "nod":
                     # Head nod / body tilt pitch down & up (zero at start and end)
                     offset_rot += anim.intensity * envelope * math.sin(prog * math.pi * 2.0)
+                elif anim.kind == "walk":
+                    cycles = max(1.0, round(anim.duration * 2.0 * anim.anim_speed))
+                    phase = prog * math.pi * 2.0 * cycles
+                    stride = math.sin(phase) * envelope * 28.0
+                    left_leg_rot += stride
+                    right_leg_rot -= stride
+                    left_arm_rot -= stride * 0.55
+                    right_arm_rot += stride * 0.55
+                    offset_y -= abs(math.sin(phase)) * 10.0 * envelope
+                elif anim.kind == "run":
+                    cycles = max(1.0, round(anim.duration * 3.2 * anim.anim_speed))
+                    phase = prog * math.pi * 2.0 * cycles
+                    stride = math.sin(phase) * envelope * 42.0
+                    left_leg_rot += stride
+                    right_leg_rot -= stride
+                    left_arm_rot -= stride * 0.80
+                    right_arm_rot += stride * 0.80
+                    offset_y -= abs(math.sin(phase)) * 18.0 * envelope
+                    offset_rot += 5.0 * envelope
+                elif anim.kind == "jump":
+                    jump_arc = math.sin(math.pi * prog)
+                    offset_y -= jump_arc * anim.intensity
+                    left_leg_rot += jump_arc * 32.0
+                    right_leg_rot -= jump_arc * 28.0
+                    left_arm_rot += jump_arc * 35.0
+                    right_arm_rot -= jump_arc * 35.0
 
         # 4. Resolve idle behaviors (breathing & blinking)
         breathe_offset_y = 0.0
@@ -302,12 +350,15 @@ class AvatarTimeline:
                 break
 
         layers = build_default_layers(
+            character=self.character,
             expression=expr,
             is_blinking=is_blinking,
             breathe_offset_y=breathe_offset_y,
             breathe_scale_y=breathe_scale_y,
             left_arm_rot=left_arm_rot,
             right_arm_rot=right_arm_rot,
+            left_leg_rot=left_leg_rot,
+            right_leg_rot=right_leg_rot,
             left_prop=left_prop,
             right_prop=right_prop,
             left_prop_scale=left_prop_scale,

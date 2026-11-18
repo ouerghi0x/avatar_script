@@ -123,12 +123,15 @@ class AuraRenderer:
         outer_alpha_img = flame_seed.filter(ImageFilter.GaussianBlur(radius=outer_blur_rad))
         outer_alpha_np = np.array(outer_alpha_img, dtype=np.float32) / 255.0
 
+        # Ensure character silhouette is treated as a single unified container with zero joint gaps
+        solid_char_img = base_alpha.filter(ImageFilter.MaxFilter(size=7)).filter(ImageFilter.MinFilter(size=7))
+        char_mask_np = np.array(solid_char_img, dtype=np.float32) / 255.0
+
         # Modulate outer bloom with the animated rising plasma noise
         modulated_outer = outer_alpha_np * (0.45 + 0.75 * flame_mask)
 
-        # Subtract inner character mask slightly so aura halos around character rather than muddying inside
-        char_mask_np = np.array(base_alpha, dtype=np.float32) / 255.0
-        hollow_aura = np.maximum(0.0, modulated_outer - char_mask_np * 0.55)
+        # Strictly outer halo: subtract the solid character container so glow never penetrates inside joints
+        hollow_aura = np.maximum(0.0, modulated_outer - char_mask_np * 0.95)
 
         # --- STEP 4: COLOR COMPOSITING ---
         base_rgb = hex_to_rgb(aura.color)
@@ -145,10 +148,11 @@ class AuraRenderer:
         c_g = np.full((full_h, full_w), g_col, dtype=np.uint8)
         c_b = np.full((full_h, full_w), b_col, dtype=np.uint8)
 
-        # Total alpha calculation
+        # Total alpha calculation - strictly an outer glow from the unified container
         core_np = np.array(core_alpha, dtype=np.float32) / 255.0
+        outer_glow = np.maximum(0.0, core_np - char_mask_np * 0.95)
         total_alpha = np.clip(
-            (hollow_aura * 1.35 + core_np * 0.65) * min(2.0, aura.intensity), 0.0, 1.0
+            (hollow_aura * 1.5 + outer_glow * 0.8) * min(2.0, aura.intensity), 0.0, 1.0
         )
         c_a = (total_alpha * 240.0).astype(np.uint8)
 

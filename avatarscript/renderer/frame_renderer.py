@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 from PIL import Image, ImageDraw
 from avatarscript.runtime.scene import SceneState
-from avatarscript.runtime.avatar import AvatarState
+from avatarscript.runtime.avatar import AvatarState, get_character_rig_config
 from avatarscript.renderer.aura_renderer import AuraRenderer
 
 
@@ -30,10 +30,42 @@ class SVGRasterizer:
 
     RIG_SIZE: Tuple[int, int] = (400, 500)
     SUPPORTED_EXTENSIONS: Tuple[str, ...] = (".png", ".svg")
+    OPTIONAL_LAYER_STEMS: Tuple[str, ...] = (
+        "back_hair",
+        "cape",
+        "jacket_back",
+        "coat_back",
+        "pants",
+        "bottoms",
+        "footwear",
+        "left_leg",
+        "right_leg",
+        "belt",
+        "waist_accessory",
+        "undershirt",
+        "inner_top",
+        "ear_accessory",
+        "earrings",
+        "front_hair",
+        "hair",
+        "jacket_sleeves",
+        "jacket_sleeve_left",
+        "jacket_sleeve_right",
+        "jacket_front_flaps",
+        "jacket_front",
+    )
 
     def __init__(self, assets_root: Path):
         self.assets_root = assets_root
         self._cache: Dict[str, Image.Image] = {}
+
+    def has_layer_asset(self, character: str, filename: str, is_prop: bool = False) -> bool:
+        """Return True if a matching layer file (.png or .svg) exists for the character/prop."""
+        try:
+            self._resolve_asset_path(character, filename, is_prop=is_prop)
+            return True
+        except FileNotFoundError:
+            return False
 
     def _find_by_stem(self, base_dir: Path, stem: str) -> Optional[Path]:
         """Find a matching asset file by stem across supported extensions."""
@@ -44,16 +76,20 @@ class SVGRasterizer:
         return None
 
     def _resolve_asset_path(self, character: str, filename: str, is_prop: bool = False) -> Path:
-        """Resolve a character layer or prop path (.svg or .png), with expression fallbacks."""
+        """Resolve a character layer or prop path (.png preferred over default .svg), with fallbacks."""
         base_dir = self.assets_root / "props" if is_prop else self.assets_root / "characters" / character
         requested = base_dir / filename
-        if requested.exists():
+        req_path = Path(filename)
+        if req_path.suffix.lower() == ".png" and requested.exists():
             return requested
 
-        stem = Path(filename).stem
+        stem = req_path.stem
         sibling = self._find_by_stem(base_dir, stem)
         if sibling is not None:
             return sibling
+
+        if requested.exists():
+            return requested
 
         if not is_prop:
             if stem.startswith("eyes_") and stem != "eyes_open":
@@ -226,9 +262,9 @@ class FrameRenderer:
 
             if getattr(layer, "is_prop", False):
                 base_prop = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename, is_prop=True)
-                # Socket hand coordinate: left arm socket is (82, 330), right arm socket is (318, 330)
                 is_right = "right" in layer.name
-                hx, hy = (318.0, 330.0) if is_right else (82.0, 330.0)
+                cfg = get_character_rig_config(avatar.character)
+                hx, hy = cfg.hand_socket_right if is_right else cfg.hand_socket_left
                 
                 # Base scale increased so props are bold and clearly recognizable (140px default)
                 # Multiplied by user-specified layer.scale_x
@@ -259,6 +295,9 @@ class FrameRenderer:
                         -layer.rotation, resample=Image.Resampling.BICUBIC, center=layer.rotation_center
                     )
                 rig_canvas.alpha_composite(prop_canvas)
+                continue
+
+            if Path(layer.asset_filename).stem in self.rasterizer.OPTIONAL_LAYER_STEMS and not self.rasterizer.has_layer_asset(avatar.character, layer.asset_filename):
                 continue
 
             base_img = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename)

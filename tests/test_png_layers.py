@@ -151,3 +151,69 @@ def test_missing_core_layer_raises_file_not_found(tmp_path: Path):
 
     with pytest.raises(FileNotFoundError, match="Missing layer asset"):
         rasterizer.load_layer_image("empty_char", "body.svg")
+
+
+def test_leg_controls_walk_run_and_jump_with_gongja():
+    """Verify leg rotations, walk/run locomotion, jump arc, and gongja PNG leg rendering."""
+    code = """
+scene "Locomotion Test":
+    canvas 1920x1080
+    fps 30
+    duration 5.0s
+
+    avatar "Gongja":
+        character "gongja"
+        position x:400 y:600
+
+        at 0.0s:
+            walk x:200 duration 1.0s speed:1.0
+
+        at 1.5s:
+            jump height:120 duration 0.8s
+
+        at 2.5s:
+            left_leg 28 duration 0.2s
+            right_leg -22 duration 0.2s
+
+        at 3.2s:
+            left_leg 0 duration 0.1s
+            right_leg 0 duration 0.1s
+            run to_x:900 duration 1.0s
+"""
+    compiler = AvatarCompiler()
+    scene = compiler.compile_source(code)
+    timeline = scene.avatars["Gongja"]
+
+    # Mid-walk: horizontal travel + opposing leg stride + arm counter-swing
+    s_walk = timeline.evaluate_at(0.125)
+    layers_walk = {l.name: l for l in s_walk.layers}
+    assert "left_leg" in layers_walk and "right_leg" in layers_walk
+    assert s_walk.x > 400.0
+    assert layers_walk["left_leg"].rotation != 0.0
+    assert layers_walk["left_leg"].rotation == pytest.approx(-layers_walk["right_leg"].rotation)
+    assert layers_walk["left_arm"].rotation * layers_walk["left_leg"].rotation < 0.0
+
+    # Peak jump at t = 1.9s: vertical arc lifts y by 120px and spreads legs/arms
+    s_jump = timeline.evaluate_at(1.9)
+    layers_jump = {l.name: l for l in s_jump.layers}
+    assert s_jump.y == pytest.approx(600.0 - 120.0, abs=1.0)
+    assert layers_jump["left_leg"].rotation > 20.0
+    assert layers_jump["right_leg"].rotation < -20.0
+
+    # Direct leg stance at t = 2.8s
+    s_stance = timeline.evaluate_at(2.8)
+    layers_stance = {l.name: l for l in s_stance.layers}
+    assert layers_stance["left_leg"].rotation == pytest.approx(28.0)
+    assert layers_stance["right_leg"].rotation == pytest.approx(-22.0)
+
+    # Mid-run at t = 3.7s: forward lean tilt and moving toward x=900
+    s_run = timeline.evaluate_at(3.7)
+    assert s_run.rotation > 1.0
+    assert s_run.x > 600.0
+
+    # Full FrameRenderer render succeeds cleanly for gongja with legs
+    renderer = FrameRenderer()
+    frame = renderer.render_frame(scene.evaluate_at(1.9), transparent=True)
+    assert frame.size == (1920, 1080)
+    assert frame.getbbox() is not None
+
