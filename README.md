@@ -491,6 +491,7 @@ AvatarScript includes **6 built-in character models** ready for use:
 - **`gongja`**: Manhwa hunter protagonist SVG rig with trench coat and utility strap.
 - **`kenney_host`**: Modular 32-bit RGBA PNG rig assembled from Kenney's CC0 Modular Characters pack (see [`examples/kenney_png_demo.ava`](examples/kenney_png_demo.ava)).
 - **`flame_emperor`**: Authentic 16-bit retro pixel-art character rig (*Yoo Soo-ha* from *SSS-Class Suicide Hunter*) with spiky flaming hair, popped-collar hunter mantle, golden brooch, and nearest-neighbor anti-blur rendering (see [`examples/flame_emperor_pixel_demo.ava`](examples/flame_emperor_pixel_demo.ava)).
+- **`pixel_narrator`** (alias: **`streamer`**): 16-bit retro anime commentary narrator & streamer rig (black zip-up hoodie, spiky dark hair, deep-blue eyes, studio broadcast microphone prop `streamer_mic`, and nearest-neighbor anti-blur rendering; see [`examples/pixel_narrator_streamer_demo.ava`](examples/pixel_narrator_streamer_demo.ava)).
 
 ### 16-Bit Retro Pixel Art Characters (`is_pixel_art: True`)
 Pixel art characters (such as `flame_emperor`) are configured with `is_pixel_art: True` in `CharacterRigConfig`. The renderer automatically switches from Lanczos/Bicubic to **Nearest-Neighbor (Point Filtering)** across layer loading, dynamic rotation, and avatar-level scaling:
