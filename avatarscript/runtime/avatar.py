@@ -52,6 +52,7 @@ class CharacterRigConfig:
     hand_socket_left: Tuple[float, float] = (110.0, 305.0)
     hand_socket_right: Tuple[float, float] = (290.0, 305.0)
     outline_stroke_width: float = 2.5
+    is_pixel_art: bool = False
 
 
 CHARACTER_RIG_CONFIGS: Dict[str, CharacterRigConfig] = {
@@ -96,6 +97,21 @@ CHARACTER_RIG_CONFIGS: Dict[str, CharacterRigConfig] = {
         hand_socket_left=(110.0, 305.0),
         hand_socket_right=(290.0, 305.0),
         outline_stroke_width=2.5,
+    ),
+    "flame_emperor": CharacterRigConfig(
+        head_anchor=(200.0, 140.0),
+        neck_anchor=(200.0, 204.0),
+        shoulder_left=(130.0, 215.0),
+        shoulder_right=(270.0, 215.0),
+        hip_anchor=(200.0, 310.0),
+        hip_left=(165.0, 315.0),
+        hip_right=(235.0, 315.0),
+        ear_left=(152.0, 144.0),
+        ear_right=(248.0, 144.0),
+        hand_socket_left=(110.0, 305.0),
+        hand_socket_right=(290.0, 305.0),
+        outline_stroke_width=2.5,
+        is_pixel_art=True,
     ),
 }
 

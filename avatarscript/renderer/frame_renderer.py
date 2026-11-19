@@ -104,7 +104,11 @@ class SVGRasterizer:
         raise FileNotFoundError(f"Missing layer asset (.svg/.png): {requested}")
 
     @staticmethod
-    def load_png(png_path: Path, target_size: Optional[Tuple[int, int]] = None) -> Image.Image:
+    def load_png(
+        png_path: Path,
+        target_size: Optional[Tuple[int, int]] = None,
+        is_pixel_art: bool = False,
+    ) -> Image.Image:
         """Load a PNG as RGBA, optionally fitting it aspect-safely inside target_size."""
         with Image.open(png_path) as src:
             img = src.convert("RGBA")
@@ -116,7 +120,8 @@ class SVGRasterizer:
         scale = min(tw / img.width, th / img.height)
         nw = max(1, int(round(img.width * scale)))
         nh = max(1, int(round(img.height * scale)))
-        resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
+        resample_filter = Image.Resampling.NEAREST if is_pixel_art else Image.Resampling.LANCZOS
+        resized = img.resize((nw, nh), resample_filter)
 
         canvas = Image.new("RGBA", target_size, (0, 0, 0, 0))
         ox = (tw - nw) // 2
@@ -124,15 +129,21 @@ class SVGRasterizer:
         canvas.paste(resized, (ox, oy), resized)
         return canvas
 
-    def load_layer_image(self, character: str, filename: str, is_prop: bool = False) -> Image.Image:
-        cache_key = f"prop/{filename}" if is_prop else f"{character}/{filename}"
+    def load_layer_image(
+        self,
+        character: str,
+        filename: str,
+        is_prop: bool = False,
+        is_pixel_art: bool = False,
+    ) -> Image.Image:
+        cache_key = f"prop/{filename}" if is_prop else f"{character}/{filename}:px={is_pixel_art}"
         if cache_key in self._cache:
             return self._cache[cache_key]
 
         asset_path = self._resolve_asset_path(character, filename, is_prop=is_prop)
         if asset_path.suffix.lower() == ".png":
             target_size = None if is_prop else self.RIG_SIZE
-            img = self.load_png(asset_path, target_size=target_size)
+            img = self.load_png(asset_path, target_size=target_size, is_pixel_art=is_pixel_art)
         else:
             img = self.rasterize_svg(asset_path)
 
@@ -256,14 +267,20 @@ class FrameRenderer:
         rig_w, rig_h = self.rasterizer.RIG_SIZE
         rig_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
 
+        cfg = get_character_rig_config(avatar.character)
+        is_pixel = getattr(cfg, "is_pixel_art", False)
+        rot_resample = Image.Resampling.NEAREST if is_pixel else Image.Resampling.BICUBIC
+        scale_resample = Image.Resampling.NEAREST if is_pixel else Image.Resampling.BICUBIC
+
         for layer in sorted(avatar.layers, key=lambda l: l.z_order):
             if not layer.visible or layer.opacity <= 0.0:
                 continue
 
             if getattr(layer, "is_prop", False):
-                base_prop = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename, is_prop=True)
+                base_prop = self.rasterizer.load_layer_image(
+                    avatar.character, layer.asset_filename, is_prop=True, is_pixel_art=is_pixel
+                )
                 is_right = "right" in layer.name
-                cfg = get_character_rig_config(avatar.character)
                 hx, hy = cfg.hand_socket_right if is_right else cfg.hand_socket_left
                 
                 # Base scale increased so props are bold and clearly recognizable (140px default)
@@ -274,7 +291,7 @@ class FrameRenderer:
                 prop_scale = base_target_dim / max_dim if max_dim > 0 else 1.0
                 pw = max(1, int(round(base_prop.width * prop_scale)))
                 ph = max(1, int(round(base_prop.height * prop_scale)))
-                scaled_prop = base_prop.resize((pw, ph), Image.Resampling.LANCZOS)
+                scaled_prop = base_prop.resize((pw, ph), scale_resample)
 
                 # Anchor prop onto rig canvas at hand socket
                 prop_canvas = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
@@ -292,7 +309,7 @@ class FrameRenderer:
                 # Apply arm's dynamic rotation around the shoulder pivot socket
                 if abs(layer.rotation) > 1e-4:
                     prop_canvas = prop_canvas.rotate(
-                        -layer.rotation, resample=Image.Resampling.BICUBIC, center=layer.rotation_center
+                        -layer.rotation, resample=rot_resample, center=layer.rotation_center
                     )
                 rig_canvas.alpha_composite(prop_canvas)
                 continue
@@ -300,14 +317,16 @@ class FrameRenderer:
             if Path(layer.asset_filename).stem in self.rasterizer.OPTIONAL_LAYER_STEMS and not self.rasterizer.has_layer_asset(avatar.character, layer.asset_filename):
                 continue
 
-            base_img = self.rasterizer.load_layer_image(avatar.character, layer.asset_filename)
+            base_img = self.rasterizer.load_layer_image(
+                avatar.character, layer.asset_filename, is_pixel_art=is_pixel
+            )
             layer_img = base_img
 
             # Apply layer-local scale if non-unit
             if abs(layer.scale_x - 1.0) > 1e-4 or abs(layer.scale_y - 1.0) > 1e-4:
                 nw = max(1, int(round(rig_w * layer.scale_x)))
                 nh = max(1, int(round(rig_h * layer.scale_y)))
-                scaled = layer_img.resize((nw, nh), Image.Resampling.BICUBIC)
+                scaled = layer_img.resize((nw, nh), scale_resample)
                 temp = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
                 ox = (rig_w - nw) // 2
                 oy = (rig_h - nh) // 2
@@ -317,7 +336,7 @@ class FrameRenderer:
             # Apply layer-local rotation if non-zero
             if abs(layer.rotation) > 1e-4:
                 layer_img = layer_img.rotate(
-                    -layer.rotation, resample=Image.Resampling.BICUBIC, center=layer.rotation_center
+                    -layer.rotation, resample=rot_resample, center=layer.rotation_center
                 )
 
             # Apply layer-local translation (x, y)
@@ -332,12 +351,12 @@ class FrameRenderer:
         if abs(avatar.scale - 1.0) > 1e-4:
             sw = max(1, int(round(rig_w * avatar.scale)))
             sh = max(1, int(round(rig_h * avatar.scale)))
-            rig_canvas = rig_canvas.resize((sw, sh), Image.Resampling.BICUBIC)
+            rig_canvas = rig_canvas.resize((sw, sh), scale_resample)
 
         # Apply avatar-level rotation
         if abs(avatar.rotation) > 1e-4:
             rig_canvas = rig_canvas.rotate(
-                -avatar.rotation, resample=Image.Resampling.BICUBIC, expand=True
+                -avatar.rotation, resample=rot_resample, expand=True
             )
 
         # Apply avatar-level opacity (fade)

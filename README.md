@@ -139,6 +139,87 @@ scene "Kenney PNG Demo":
 
 ---
 
+## Showcase Demo 3: Native 16-Bit Pixel Art Rig (`flame_emperor`)
+
+AvatarScript natively supports **16-bit retro pixel art character rigs** with dedicated **Nearest-Neighbor (Point Filtering)** scaling and rotation. Below is the **Flame Emperor (Yoo Soo-ha)** showcase featuring spiky flame-red hair, popped hunter collar, cocky smirk, dynamic arm gestures, and blazing procedural fire aura with 100% crisp, zero-blur pixel preservation:
+
+<p align="center">
+  <img src="assets/branding/flame_emperor_pixel_demo.gif" alt="Flame Emperor Pixel Art Rig Demo" width="640" />
+</p>
+
+<details>
+<summary><b>View the complete <code>examples/flame_emperor_pixel_demo.ava</code> script</b></summary>
+
+```ava
+# Flame Emperor 16-bit Retro Pixel Art Showcase
+# Demonstrates native pixel art character rig, expressions, talk mouth flaps,
+# gestures, and blazing flame aura with zero-blur pixel preservation.
+
+scene "Flame Emperor 16-bit Pixel Art Showcase":
+    canvas 1920x1080
+    background "#120a14"
+    fps 30
+    duration 6.0s
+    render "examples/flame_emperor_pixel_demo.mp4"
+
+    avatar "FlameEmperor":
+        character "flame_emperor"
+        position center
+        scale 1.35
+
+        idle:
+            breathe
+            blink every 3.2s
+
+        # 0.0s: Calm, confident entrance with composed gaze
+        at 0.0s:
+            expression neutral
+            head_turn yaw:-12 duration 0.4s
+
+        # 1.0s: Arrogant smirk with cocky head tilt and gesture
+        at 1.0s:
+            expression smirk
+            head_turn yaw:10 duration 0.35s
+            right_arm deg:-25 duration 0.3s
+            talk duration 1.2s
+
+        # 2.2s: Fire aura ignites as Flame Emperor unleashes his power
+        at 2.2s:
+            expression angry
+            head_turn yaw:0 duration 0.2s
+            aura orange size:40 intensity:1.2 speed:1.5 sparks:1 duration 0.4s
+            shake intensity:6 duration 0.8s
+            left_arm deg:25 duration 0.25s
+            right_arm deg:-35 duration 0.25s
+
+        # 3.2s: Maximum flame burst with roaring expression & screen shake
+        at 3.2s:
+            expression angry
+            aura red size:65 intensity:2.2 speed:2.4 sparks:1 duration 0.2s
+            bounce intensity:14 duration 0.5s
+            shake intensity:18 duration 1.2s
+            scale 1.45 duration 0.3s easing elastic_out
+
+        # 4.5s: Stabilized burning flame with signature cocky smirk
+        at 4.5s:
+            expression smirk
+            aura orange size:45 intensity:1.5 speed:1.4 sparks:1 duration 0.4s
+            scale 1.35 duration 0.4s easing ease_in_out
+            right_arm deg:-10 duration 0.3s
+            left_arm deg:10 duration 0.3s
+            talk duration 1.0s
+
+        # 5.5s: Extinguish aura smoothly back to neutral
+        at 5.5s:
+            expression neutral
+            aura none duration 0.4s
+            right_arm deg:0 duration 0.4s
+            left_arm deg:0 duration 0.4s
+```
+</details>
+
+---
+
 **AvatarScript** is a lightweight, deterministic Domain-Specific Language (DSL) and animation engine written in Python for describing, previewing, and rendering 2D animated reaction avatars for YouTube videos, anime reactions, manhwa narrations, and commentary shorts.
 
 Instead of keyframing every facial change, blink, breathing cycle, or bounce manually in a video editor, creators write declarative `.ava` scripts and compile them directly into H.264 `.mp4` videos or 32-bit RGBA transparent `.png` frame sequences.
@@ -153,6 +234,7 @@ Instead of keyframing every facial change, blink, breathing cycle, or bounce man
 - **Audio-Driven Viseme Lip-Sync**: Pass any `.mp3` or `.wav` voiceover track directly to `talk audio:"..."` to automatically articulate realistic mouth visemes synchronized to speech volume and syllable cadence.
 - **Interactive Vector & PNG Prop Rigging**: Equip avatars with `.svg` or `.png` props such as microphones, swords, controllers, or phones (`hold item:"microphone" hand:right scale:1.4`) that dynamically anchor to hands and rotate naturally with arm gestures.
 - **Hybrid 2× Supersampled SVG & RGBA PNG Rig**: Renders modular multi-layer characters (`body`, `head`, `left_arm`, `right_arm`, `eyes`, `mouth`, `props`) from either pure-Python `.svg` vectors or transparent RGBA `.png` sprites (including mixed `.svg` + `.png` rigs) with aspect-ratio-safe `400×500` containment, automatic expression fallbacks, and quantized rig caching—no external C/Cairo DLL dependencies required.
+- **First-Class 16-Bit Pixel Art Engine**: Dedicated support for retro pixel-art character rigs via `is_pixel_art: True`. Uses `Image.Resampling.NEAREST` point filtering to keep pixel art razor-sharp across timeline scaling, arm rotations, and lip-syncing with zero antialiasing blur.
 - **Procedural Non-Destructive Aura System**: Dragon Ball Z-style energy flames, multi-harmonic plasma noise, white-hot core, and electric lightning arcs rendered directly from the character silhouette without modifying original sprite pixels.
 - **Real-Time Pygame Preview & FFmpeg Export**: Interactive preview window with play/pause/scrub controls, plus direct H.264 (`yuv420p`) MP4 export and transparent RGBA PNG sequence export for NLE overlay workflows.
 - **Interactive VS Code Extension**: Full syntax highlighting, auto-completion snippets, and one-click commands to validate, preview, and render `.ava` scripts without using the terminal.
@@ -401,13 +483,25 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 ## 6. Built-in Characters, Custom PNG/SVG Rigs & Props
 
 ### Built-in Characters
-AvatarScript includes **5 built-in character models** ready for use:
+AvatarScript includes **6 built-in character models** ready for use:
 
 - **`default`**: Standard blue hoodie SVG narrator.
 - **`ninja`**: Dark shinobi gi SVG rig with crimson belt, stealth hood, and headband plate.
 - **`demon`**: Crimson skin SVG rig with horns, rune mark, dark armor, and claws.
 - **`gongja`**: Manhwa hunter protagonist SVG rig with trench coat and utility strap.
 - **`kenney_host`**: Modular 32-bit RGBA PNG rig assembled from Kenney's CC0 Modular Characters pack (see [`examples/kenney_png_demo.ava`](examples/kenney_png_demo.ava)).
+- **`flame_emperor`**: Authentic 16-bit retro pixel-art character rig (*Yoo Soo-ha* from *SSS-Class Suicide Hunter*) with spiky flaming hair, popped-collar hunter mantle, golden brooch, and nearest-neighbor anti-blur rendering (see [`examples/flame_emperor_pixel_demo.ava`](examples/flame_emperor_pixel_demo.ava)).
+
+### 16-Bit Retro Pixel Art Characters (`is_pixel_art: True`)
+Pixel art characters (such as `flame_emperor`) are configured with `is_pixel_art: True` in `CharacterRigConfig`. The renderer automatically switches from Lanczos/Bicubic to **Nearest-Neighbor (Point Filtering)** across layer loading, dynamic rotation, and avatar-level scaling:
+- Prevents pixel smearing or fuzziness when rendering at 1080p/4K.
+- Keeps pixel grid edges razor-sharp even during elastic bounces, screen shakes, or arm rotations.
+- Supports all modular features: mouth flaps, blinking, expressions, and aura bursts.
+
+```powershell
+# Render the 16-bit Pixel Art Flame Emperor demo
+& "avatarscript\.venv\Scripts\avatarscript.exe" render avatarscript\examples\flame_emperor_pixel_demo.ava -o flame_emperor_pixel_demo.mp4
+```
 
 ### Supporting Custom PNG & Mixed SVG/PNG Characters
 You can build custom characters using transparent RGBA `.png` images, `.svg` vectors, or a mix of both by placing layers under `assets/characters/<name>/`:
