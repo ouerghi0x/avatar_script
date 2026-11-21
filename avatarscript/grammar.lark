@@ -96,7 +96,7 @@ expression_stmt: "expression" NAME _NL
 animate_stmt: "animate" NAME anim_param* _NL
 direct_transform_stmt: TRANSFORM_KIND anim_param* _NL
 
-TRANSFORM_KIND.2: "move" | "scale" | "rotate" | "fade" | "nod" | "arm" | "left_arm" | "right_arm" | "leg" | "left_leg" | "right_leg" | "walk" | "run" | "jump" | "aura" | "shake" | "bounce"
+TRANSFORM_KIND.2: "move" | "scale" | "rotate" | "fade" | "nod" | "arm" | "left_arm" | "right_arm" | "leg" | "left_leg" | "right_leg" | "walk" | "run" | "jump" | "aura" | "shake" | "bounce" | "explode"
 
 ?anim_param: "duration" TIME          -> param_duration
            | "easing" NAME            -> param_easing
@@ -105,7 +105,12 @@ TRANSFORM_KIND.2: "move" | "scale" | "rotate" | "fade" | "nod" | "arm" | "left_a
            | "size" (":"? SIGNED_NUMBER)     -> param_size
            | "speed" (":"? SIGNED_NUMBER)    -> param_speed
            | "sparks" (":"? (NAME | SIGNED_NUMBER)) -> param_sparks
-           | NAME ":" (SIGNED_NUMBER | STRING | NAME) -> param_kv
+           | "separated" (":"? (TIME | SIGNED_NUMBER)) -> param_separated
+           | "hold" (":"? (TIME | SIGNED_NUMBER))      -> param_hold
+           | "reassemble" (":"? (TIME | SIGNED_NUMBER))-> param_reassemble
+           | "scatter" (":"? (TIME | SIGNED_NUMBER))   -> param_scatter
+           | "fire" (":"? (NAME | SIGNED_NUMBER | STRING)) -> param_fire
+           | NAME ":" (SIGNED_NUMBER | STRING | NAME | TIME) -> param_kv
            | NAME                     -> param_name
            | SIGNED_NUMBER            -> param_val
 

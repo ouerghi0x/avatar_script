@@ -469,6 +469,37 @@ Animations can be written using either `animate <kind> ...` or direct shorthand 
 | `scale`     | `scale 1.35 duration 0.4s easing elastic_out`                              | Smoothly interpolates avatar scale to target multiplier.                   |
 | `rotate`    | `rotate 15 duration 0.3s easing ease_out`                                  | Smoothly interpolates avatar rotation (degrees).                           |
 | `fade`      | `fade 0.0 duration 0.5s easing ease_in`                                    | Smoothly interpolates avatar opacity (`0.0` transparent to `1.0` opaque).  |
+| `explode`   | `explode duration 3.5s separated:1.5s reassemble:1.4s scatter:0.5s intensity:1.2` | Blows character apart into body parts, hovers in zero-gravity, and reassembles smoothly. |
+
+### Dynamic Explosion & Reassembly Animation (`explode`)
+
+AvatarScript includes a cinematic body-part separation and reassembly effect. The character's individual body clusters (head, torso, arms, legs, and held props) blast outward in opposite directions, hover weightlessly in mid-air with subtle floating drift and rotation, and then magnetically reassemble back to their exact resting positions with zero teleportation or jump cuts:
+
+<p align="center">
+  <img src="assets/branding/explode_reassemble_showcase.gif" alt="Dynamic Explode & Reassembly Showcase" width="600" />
+</p>
+
+```ava
+# Explode syntax with fully customizable timing:
+at 1.5s:
+    explode duration 3.5s scatter:0.5s separated:1.6s reassemble:1.4s intensity:1.15
+```
+
+#### Explode Sequence & Phase Breakdown:
+1. **Phase 1: Explosion & Outward Blast (`scatter:<TIME>`)**: The character experiences an initial screen shake shockwave, swaps to a comedic/dramatic shocked expression, and body parts blast outward in opposite directions (head upwards, left arm upper-left, right arm upper-right, left leg down-left, right leg down-right, torso centered).
+2. **Phase 2: Zero-Gravity Hovering (`separated:<TIME>` / `hold:<TIME>`)**: Body parts remain fully separated in mid-air, floating and hovering with multi-harmonic sinusoidal drift and gentle angular sway.
+3. **Phase 3: Smooth Magnetic Reassembly (`reassemble:<TIME>` / `return:<TIME>`)**: Individual body parts smoothly travel back toward origin along natural ease-in-out curves, seamlessly snapping back into place.
+4. **Phase 4: Completion**: All body parts return 100% precisely to their original coordinates, angles, and scale ($dx=0, dy=0, d\theta=0$), gracefully resuming normal idle breathing and blinking cycles.
+
+#### Customizable Parameters:
+- `duration <TIME>`: Total duration of the animation cycle (e.g. `duration 3.5s`).
+- `separated:<TIME>` (or `hold:`, `float:`): Exact duration that pieces remain fully separated and floating before reassembly begins.
+- `reassemble:<TIME>` (or `return:`, `reassembly:`): Exact duration taken to smoothly reconnect the body parts back to the torso.
+- `scatter:<TIME>` (or `burst:`): Duration of the initial outward explosion phase (default: $\approx 0.4\text{s}$).
+- `intensity:<FLOAT>`: Blast distance and impulse multiplier (default: `1.0`).
+- `fire:<BOOL|STRING>`: Procedural explosion fire & ember system (default: `true`). Can also pass a color name (`fire: "orange"`, `fire: "red"`, `fire: "blue"`, `fire: "purple"`, `fire: "gold"`).
+- `color:<NAME>`: Palette color preset for the explosion fireball, shockwave rings, and drifting embers (`orange`, `red`, `blue`, `purple`, `gold`).
+- `easing:<NAME>`: Easing curve for the reassembly trajectory (default: `ease_in_out`).
 
 **Supported Easing Functions (`easing <name>`)**:
 

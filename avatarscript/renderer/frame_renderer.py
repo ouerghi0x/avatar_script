@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 from avatarscript.runtime.scene import SceneState
 from avatarscript.runtime.avatar import AvatarState, get_character_rig_config
 from avatarscript.renderer.aura_renderer import AuraRenderer
+from avatarscript.renderer.explosion_renderer import ExplosionRenderer
 
 
 def parse_color(color_str: Optional[str]) -> Optional[Tuple[int, int, int, int]]:
@@ -311,6 +312,13 @@ class FrameRenderer:
                     prop_canvas = prop_canvas.rotate(
                         -layer.rotation, resample=rot_resample, center=layer.rotation_center
                     )
+
+                # Apply layer translation (e.g. arm movement or explosion)
+                if abs(layer.x) > 1e-4 or abs(layer.y) > 1e-4:
+                    temp = Image.new("RGBA", (rig_w, rig_h), (0, 0, 0, 0))
+                    temp.paste(prop_canvas, (int(round(layer.x)), int(round(layer.y))))
+                    prop_canvas = temp
+
                 rig_canvas.alpha_composite(prop_canvas)
                 continue
 
@@ -392,6 +400,23 @@ class FrameRenderer:
                     aura_img, off_x, off_y = aura_res
                     frame.alpha_composite(aura_img, dest=(paste_x + off_x, paste_y + off_y))
 
+            # Non-destructive procedural explosion fire layer behind the character
+            front_explosion = None
+            if getattr(avatar, "explosion", None) and avatar.explosion.active and avatar.explosion.fire:
+                behind_res, front_res = ExplosionRenderer.render_explosion(
+                    avatar.explosion, (avatar.x, avatar.y)
+                )
+                if behind_res is not None:
+                    b_img, bx, by = behind_res
+                    frame.alpha_composite(b_img, dest=(bx, by))
+                if front_res is not None:
+                    front_explosion = front_res
+
             frame.alpha_composite(rig_img, dest=(paste_x, paste_y))
+
+            # Procedural explosion foreground sparks/core in front of character
+            if front_explosion is not None:
+                f_img, fx, fy = front_explosion
+                frame.alpha_composite(f_img, dest=(fx, fy))
 
         return frame

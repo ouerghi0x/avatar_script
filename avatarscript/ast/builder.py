@@ -342,16 +342,47 @@ class ASTBuilder(Transformer):
             val = bool(float(val_str))
         return ("kv", ("sparks", val))
 
+    def param_separated(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, float]]:
+        val_str = str(children[0])
+        val = _parse_time(val_str) if val_str.endswith("s") else float(val_str)
+        return ("kv", ("separated", val))
+
+    def param_hold(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, float]]:
+        val_str = str(children[0])
+        val = _parse_time(val_str) if val_str.endswith("s") else float(val_str)
+        return ("kv", ("hold", val))
+
+    def param_reassemble(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, float]]:
+        val_str = str(children[0])
+        val = _parse_time(val_str) if val_str.endswith("s") else float(val_str)
+        return ("kv", ("reassemble", val))
+
+    def param_scatter(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, float]]:
+        val_str = str(children[0])
+        val = _parse_time(val_str) if val_str.endswith("s") else float(val_str)
+        return ("kv", ("scatter", val))
+
+    def param_fire(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, Any]]:
+        val_str = _strip_quotes(str(children[0])).lower()
+        if val_str in ("true", "1", "yes", "on"):
+            return ("kv", ("fire", True))
+        elif val_str in ("false", "0", "no", "off"):
+            return ("kv", ("fire", False))
+        return ("kv", ("fire", val_str))
+
     def param_name(self, meta: Any, children: List[Any]) -> Tuple[str, str]:
         return ("val", str(children[0]))
 
     def param_kv(self, meta: Any, children: List[Any]) -> Tuple[str, Tuple[str, Any]]:
         k = str(children[0])
         val_raw = str(children[1])
-        try:
-            v: Any = float(val_raw)
-        except ValueError:
-            v = _strip_quotes(val_raw)
+        if val_raw.endswith("s") and len(val_raw) > 1 and val_raw[:-1].replace(".", "", 1).isdigit():
+            v: Any = _parse_time(val_raw)
+        else:
+            try:
+                v = float(val_raw)
+            except ValueError:
+                v = _strip_quotes(val_raw)
         return ("kv", (k, v))
 
     def param_val(self, meta: Any, children: List[Any]) -> Tuple[str, float]:

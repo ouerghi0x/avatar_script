@@ -35,6 +35,7 @@ VALID_ANIMATIONS = {
     "run",
     "jump",
     "aura",
+    "explode",
 }
 
 
@@ -250,8 +251,14 @@ class SemanticValidator:
                             audio_path = self.assets_root.parent / audio_path
                         if not audio_path.exists():
                             # Check under workspace root as fallback
-                            ws_audio = Path.cwd() / act.audio
-                            if not ws_audio.exists():
+                            candidates = [
+                                Path.cwd() / act.audio,
+                                Path.cwd() / "content" / act.audio,
+                                Path.cwd().parent / "content" / act.audio,
+                                Path.cwd().parent / act.audio,
+                            ]
+                            found = any(c.exists() for c in candidates)
+                            if not found:
                                 errors.append(
                                     ValidationError(f"Audio file '{act.audio}' not found", act.loc)
                                 )
@@ -360,6 +367,34 @@ class SemanticValidator:
                 errors.append(
                     ValidationError(
                         f"Target opacity for 'fade' must be between 0.0 and 1.0 (got {target})",
+                        anim.loc,
+                    )
+                )
+        elif anim.kind == "explode":
+            allowed_keys = {
+                "separated",
+                "hold",
+                "float",
+                "reassemble",
+                "reassembly",
+                "return",
+                "scatter",
+                "explode",
+                "burst",
+                "intensity",
+                "speed",
+                "shake",
+                "fire",
+                "flame",
+                "color",
+                "sparks",
+                "smoke",
+            }
+            unknown_keys = set(anim.params.keys()) - allowed_keys
+            if unknown_keys:
+                errors.append(
+                    ValidationError(
+                        f"Invalid parameter(s) {sorted(unknown_keys)} for 'explode' animation",
                         anim.loc,
                     )
                 )

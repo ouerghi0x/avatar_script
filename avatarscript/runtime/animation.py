@@ -5,6 +5,7 @@ from typing import List, Optional, Tuple
 from pathlib import Path
 from avatarscript.runtime.avatar import AvatarState, build_default_layers
 from avatarscript.renderer.aura_renderer import AuraState
+from avatarscript.renderer.explosion_renderer import ExplosionState
 from avatarscript.runtime.interpolation import apply_easing, lerp
 from avatarscript.runtime.lipsync import AudioSpeechAnalyzer
 
@@ -37,6 +38,12 @@ class AnimationEvent:
     aura_size: Optional[float] = None
     aura_speed: Optional[float] = None
     aura_sparks: Optional[bool] = None
+    # Explode parameters
+    hold_duration: Optional[float] = None
+    reassemble_duration: Optional[float] = None
+    scatter_duration: Optional[float] = None
+    fire_enabled: bool = True
+    fire_color: str = "orange"
 
 
 @dataclass
@@ -161,11 +168,25 @@ class AvatarTimeline:
 
         # 1. Resolve expression (latest event with timestamp <= t)
         expr = self.initial_expression
+        latest_expr_time = -1.0
         for ev in sorted(self.expressions, key=lambda e: e.timestamp):
             if ev.timestamp <= t + 1e-9:
                 expr = ev.expression
+                latest_expr_time = ev.timestamp
             else:
                 break
+
+        # Check for active explode animation
+        active_explode: Optional[AnimationEvent] = None
+        for anim in self.animations:
+            if anim.kind == "explode" and anim.start_time <= t < anim.start_time + anim.duration:
+                active_explode = anim
+                break
+
+        if active_explode is not None:
+            # If no explicit expression event occurred after the explosion began, show shocked
+            if latest_expr_time < active_explode.start_time:
+                expr = "shocked"
 
         # 2. Build independent transform channels for snapshot-on-start evaluation
         x_events: List[Tuple[float, float, str, float, bool]] = []
@@ -318,6 +339,13 @@ class AvatarTimeline:
                     right_leg_rot -= jump_arc * 28.0
                     left_arm_rot += jump_arc * 35.0
                     right_arm_rot -= jump_arc * 35.0
+                elif anim.kind == "explode":
+                    tau = t - anim.start_time
+                    s_dur = anim.scatter_duration if anim.scatter_duration is not None else 0.4
+                    if tau < s_dur:
+                        u = tau / max(1e-4, s_dur)
+                        burst_envelope = math.sin(math.pi * u) * (1.0 - u)
+                        offset_x += burst_envelope * (16.0 * anim.intensity) * math.sin(u * math.pi * 10.0)
 
         # 4. Resolve idle behaviors (breathing & blinking)
         breathe_offset_y = 0.0
@@ -397,6 +425,131 @@ class AvatarTimeline:
                     l.asset_filename = speaking_mouth
                     break
 
+        # Resolve Explode dynamic layer displacement & reassembly
+        if active_explode is not None:
+            tau = t - active_explode.start_time
+            dur = max(1e-4, active_explode.duration)
+            s_dur = active_explode.scatter_duration if active_explode.scatter_duration is not None else 0.4
+            h_dur = active_explode.hold_duration if active_explode.hold_duration is not None else 1.2
+            r_dur = active_explode.reassemble_duration if active_explode.reassemble_duration is not None else 1.4
+
+            total_dur = s_dur + h_dur + r_dur
+            if abs(total_dur - dur) > 1e-4:
+                factor = dur / total_dur
+                s_dur *= factor
+                h_dur *= factor
+                r_dur *= factor
+
+            S = float(active_explode.intensity if active_explode.intensity is not None else 1.0)
+            easing_mode = active_explode.easing or "ease_in_out"
+
+            if tau < s_dur:
+                # Phase 1: Explosion outward
+                u = tau / max(1e-4, s_dur)
+                k = apply_easing(u, "ease_out")
+                w_float = apply_easing(u, "ease_in") * 0.4
+            elif tau < s_dur + h_dur:
+                # Phase 2: Floating separated in air
+                k = 1.0
+                w_float = 1.0
+            else:
+                # Phase 3: Smooth reassembly
+                v = (tau - (s_dur + h_dur)) / max(1e-4, r_dur)
+                v = min(1.0, max(0.0, v))
+                e_re = apply_easing(v, easing_mode)
+                k = 1.0 - e_re
+                w_float = (1.0 - v) * (1.0 - e_re)
+
+            for layer in layers:
+                name = layer.name.lower()
+                dx = 0.0
+                dy = 0.0
+                drot = 0.0
+
+                if any(h in name for h in ("head", "eyes", "mouth", "front_hair", "ear_accessory", "back_hair")):
+                    base_dx = -16.0 * S
+                    base_dy = -135.0 * S
+                    base_rot = -12.0 * S
+                    float_dx = 5.0 * math.sin(3.5 * tau)
+                    float_dy = 7.0 * math.cos(2.8 * tau)
+                    float_rot = 3.5 * math.sin(2.1 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                elif "left" in name and ("arm" in name or "sleeve" in name or "prop" in name):
+                    base_dx = -135.0 * S
+                    base_dy = -50.0 * S
+                    base_rot = 38.0 * S
+                    float_dx = 6.0 * math.cos(3.0 * tau + 1.0)
+                    float_dy = 8.0 * math.sin(2.5 * tau + 0.5)
+                    float_rot = 5.0 * math.cos(2.0 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                elif "right" in name and ("arm" in name or "sleeve" in name or "prop" in name):
+                    base_dx = 140.0 * S
+                    base_dy = -45.0 * S
+                    base_rot = -40.0 * S
+                    float_dx = -6.0 * math.sin(2.7 * tau + 0.8)
+                    float_dy = 8.0 * math.cos(3.2 * tau + 1.2)
+                    float_rot = -5.0 * math.sin(2.2 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                elif "left_leg" in name:
+                    base_dx = -85.0 * S
+                    base_dy = 110.0 * S
+                    base_rot = -22.0 * S
+                    float_dx = 5.0 * math.sin(2.2 * tau + 2.0)
+                    float_dy = 6.0 * math.cos(2.0 * tau + 1.5)
+                    float_rot = 4.0 * math.sin(1.8 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                elif "right_leg" in name:
+                    base_dx = 85.0 * S
+                    base_dy = 112.0 * S
+                    base_rot = 22.0 * S
+                    float_dx = -5.0 * math.cos(2.4 * tau + 0.3)
+                    float_dy = 6.0 * math.sin(2.6 * tau + 0.7)
+                    float_rot = -4.0 * math.cos(2.1 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                elif any(b in name for b in ("body", "undershirt", "belt", "jacket_front_flaps", "jacket_back", "pants")):
+                    base_dx = 0.0
+                    base_dy = 20.0 * S
+                    base_rot = 0.0
+                    float_dx = 2.0 * math.sin(2.0 * tau)
+                    float_dy = 3.5 * math.cos(2.5 * tau)
+                    float_rot = 1.5 * math.sin(1.5 * tau)
+                    dx = k * base_dx + w_float * float_dx
+                    dy = k * base_dy + w_float * float_dy
+                    drot = k * base_rot + w_float * float_rot
+
+                layer.x += dx
+                layer.y += dy
+                layer.rotation += drot
+
+        eval_explosion = None
+        if active_explode is not None:
+            eval_explosion = ExplosionState(
+                active=True,
+                tau=tau,
+                duration=dur,
+                scatter_duration=s_dur,
+                hold_duration=h_dur,
+                reassemble_duration=r_dur,
+                intensity=S,
+                fire=active_explode.fire_enabled,
+                color=active_explode.fire_color,
+            )
+
         # 5. Resolve Aura State
         aura_active = False
         aura_color = "gold"
@@ -447,4 +600,5 @@ class AvatarTimeline:
             is_blinking=is_blinking,
             layers=layers,
             aura=evaluated_aura,
+            explosion=eval_explosion,
         )

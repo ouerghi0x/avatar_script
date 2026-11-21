@@ -323,6 +323,73 @@ class AvatarCompiler:
                 else:
                     aura_sparks = str(sparks_val).lower() not in ("0", "false", "off", "no")
 
+        hold_duration = None
+        for k in ("separated", "hold", "float"):
+            if k in act.params:
+                val = act.params[k]
+                hold_duration = float(str(val).rstrip("s"))
+                break
+
+        reassemble_duration = None
+        for k in ("reassemble", "reassembly", "return"):
+            if k in act.params:
+                val = act.params[k]
+                reassemble_duration = float(str(val).rstrip("s"))
+                break
+
+        scatter_duration = None
+        for k in ("scatter", "explode", "burst"):
+            if k in act.params:
+                val = act.params[k]
+                scatter_duration = float(str(val).rstrip("s"))
+                break
+
+        if act.kind == "explode":
+            if act.duration is None:
+                if hold_duration is not None and reassemble_duration is not None:
+                    s_dur = scatter_duration if scatter_duration is not None else 0.5
+                    dur = s_dur + hold_duration + reassemble_duration
+                else:
+                    dur = 3.0
+
+            if scatter_duration is None:
+                if hold_duration is not None and reassemble_duration is not None and (hold_duration + reassemble_duration < dur):
+                    scatter_duration = max(0.1, dur - hold_duration - reassemble_duration)
+                else:
+                    scatter_duration = max(0.2, min(0.6, dur * 0.20))
+
+            if reassemble_duration is None:
+                reassemble_duration = max(0.2, dur * 0.40)
+
+            if hold_duration is None:
+                hold_duration = max(0.0, dur - scatter_duration - reassemble_duration)
+
+            intensity = float(act.params.get("intensity", act.intensity if act.intensity is not None else 1.0))
+
+        fire_enabled = True
+        fire_color = "orange"
+        if act.kind == "explode":
+            if "fire" in act.params:
+                f_val = act.params["fire"]
+                if isinstance(f_val, bool):
+                    fire_enabled = f_val
+                elif str(f_val).lower() in ("false", "0", "off", "none", "no"):
+                    fire_enabled = False
+                elif str(f_val).lower() in ("true", "1", "on", "yes"):
+                    fire_enabled = True
+                else:
+                    fire_enabled = True
+                    fire_color = str(f_val).lower()
+            if "flame" in act.params:
+                fl_val = act.params["flame"]
+                if isinstance(fl_val, bool):
+                    fire_enabled = fl_val
+                else:
+                    fire_enabled = True
+                    fire_color = str(fl_val).lower()
+            if "color" in act.params:
+                fire_color = str(act.params["color"]).lower()
+
         return AnimationEvent(
             kind=act.kind,
             start_time=start_time,
@@ -347,4 +414,9 @@ class AvatarCompiler:
             aura_size=aura_size,
             aura_speed=aura_speed,
             aura_sparks=aura_sparks,
+            hold_duration=hold_duration,
+            reassemble_duration=reassemble_duration,
+            scatter_duration=scatter_duration,
+            fire_enabled=fire_enabled,
+            fire_color=fire_color,
         )

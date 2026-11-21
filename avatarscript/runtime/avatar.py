@@ -1,8 +1,9 @@
 """Layer-based 2D Avatar model and deterministic state representation."""
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from avatarscript.runtime.expressions import resolve_expression_assets
 from avatarscript.renderer.aura_renderer import AuraState
+from avatarscript.renderer.explosion_renderer import ExplosionState
 
 
 @dataclass
@@ -35,6 +36,7 @@ class AvatarState:
     is_blinking: bool = False
     layers: List[LayerState] = field(default_factory=list)
     aura: AuraState = field(default_factory=AuraState)
+    explosion: Optional[ExplosionState] = None
 
 
 @dataclass(frozen=True)
